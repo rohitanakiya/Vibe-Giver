@@ -157,11 +157,23 @@ vibegiver inspect runs/20261118-120000-123456
 
 `inspect` changes nothing. It validates a run against the contract and reports
 what Giver would attempt, what needs a person, how each finding would be
-verified, and what the run could not establish. It exits `1` while anything is
-open, `3` on a contract refusal, `2` on a failure to complete.
+verified, and what the run could not establish.
 
 Exit codes match Killer's so a pipeline running both learns one scheme: `0`
-done, `1` something still open, `2` could not complete, `3` refused.
+done, `1` something still open, `2` could not complete, `3` refused. But `0`
+requires **both** that there is nothing to fix and that the run actually
+looked — a distinction CI caught the hard way.
+
+On a bare runner with no Semgrep, osv-scanner or gitleaks installed, Killer
+scans a deliberately vulnerable Flask fixture, prints "No findings from the
+checks that ran", lists all fourteen checks as skipped, and **exits 0**. Every
+signal a pipeline normally gates on says clean, on real infrastructure, with
+nothing misconfigured. So `vibegiver inspect` exits `1` there and says the run
+established nothing. Zero findings is a clean result only when something
+looked.
+
+> Measure exit codes against the built binary, not `go run`, which reports its
+> own exit `1` for any non-zero exit — collapsing all four codes into one.
 
 ## Development
 

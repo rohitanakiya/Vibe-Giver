@@ -174,10 +174,20 @@ clean".`,
 
 			printCoverage(cmd, doc)
 
-			// Exit non-zero while anything is still open, so this is usable
-			// as a gate. Nothing has been fixed yet at this point, by
-			// definition: inspect changes nothing.
-			if len(attempt)+len(human) > 0 {
+			// Exit 0 means "there is nothing here to fix, and this run
+			// looked". Both halves, because a run that found nothing while
+			// checking nothing is the single most dangerous thing this tool
+			// could call success -- and it is not a corner case: a bare CI
+			// runner with no scanners installed produces exactly that, from
+			// a deliberately vulnerable application, and Killer exits 0 on
+			// it too.
+			if !doc.EstablishesClean() {
+				if len(attempt)+len(human) == 0 {
+					return exitWith(ExitUnfixed,
+						"\nNothing was found, but this run did not establish that there is nothing to find.\n"+
+							"That is not a clean result. Install the missing checks, or scan a running\n"+
+							"instance, and look again.")
+				}
 				return exitWith(ExitUnfixed, "")
 			}
 			return nil

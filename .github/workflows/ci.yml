@@ -106,37 +106,94 @@ jobs:
       - name: build the binary the assertions run
         run: go build -o bin/vibegiver ./cmd/vibegiver
 
-      - name: scan a vulnerable fixture and read the result
+      - name: stage the fixture
         run: |
           set -euo pipefail
           mkdir -p .work
           cp -r .killer/fixtures/flask-vulnerable .work/app
           (cd .work/app && vibekiller init)
 
-          # --static-only never schedules the endpoint, runtime or exposure
-          # layers, so the document carries both findings and a populated
-          # skipped[]. Both halves of the contract in one artifact.
-          #
-          # Exit 1 is the expected outcome on a deliberately vulnerable
-          # fixture: an open finding at or above the severity threshold.
+      # Case A: the runner is bare, so no scanner is installed. This is not a
+      # contrived case -- it is what the first run of this job produced, and
+      # it is the most dangerous output in the whole system.
+      #
+      # Killer scans a deliberately vulnerable Flask application, reports "No
+      # findings from the checks that ran", lists all fourteen checks as
+      # skipped, and exits 0. Its success code. Every signal a pipeline
+      # usually gates on says clean.
+      #
+      # So this asserts that Giver refuses that conclusion: exit 1, and the
+      # coverage warning present in the output. Killer's own exit 0 is
+      # asserted too, because if a later Killer changes it this job should say
+      # so rather than quietly start testing something else.
+      - name: case A, no scanners installed - zero findings is not clean
+        run: |
+          set -euo pipefail
+          cd .work
+          set +e
+          vibekiller scan --repo app --static-only --runs-dir runs-bare --quiet
+          scan_code=$?
+          set -e
+          if [ "$scan_code" -ne 0 ]; then
+            echo "::notice::Killer exited $scan_code on a bare runner (was 0 when this was written)."
+          fi
+
+          run_dir="runs-bare/$(ls runs-bare | head -1)"
+          found="$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1]))['findings']))" "$run_dir/findings.json")"
+          skipped="$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1])).get('skipped',[])))" "$run_dir/findings.json")"
+          echo "bare runner: $found finding(s), $skipped skipped check(s)"
+          if [ "$found" -ne 0 ] || [ "$skipped" -eq 0 ]; then
+            echo "::error::Expected the bare-runner shape: 0 findings and a populated skipped[]. This step is no longer testing what it was written for." >&2
+            exit 1
+          fi
+
+          cd ..
+          set +e
+          out="$(./bin/vibegiver inspect ".work/$run_dir" 2>&1)"
+          code=$?
+          set -e
+          echo "$out"
+          if [ "$code" -ne 1 ]; then
+            echo "::error::inspect exited $code on a run that found nothing because nothing ran. Want 1: that run established nothing and is not a clean result." >&2
+            exit 1
+          fi
+          if ! grep -q "did not establish" <<<"$out"; then
+            echo "::error::inspect did not say that the run established nothing." >&2
+            exit 1
+          fi
+
+      # Case B: with a scanner present, the same fixture yields real findings.
+      # osv-scanner is used rather than Semgrep because it is a Go install and
+      # takes seconds; the fixture pins old dependencies deliberately, so it
+      # is the layer guaranteed to produce findings here.
+      - name: install osv-scanner
+        run: go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
+
+      - name: case B, a scanner present - findings appear and are attemptable
+        run: |
+          set -euo pipefail
           cd .work
           set +e
           vibekiller scan --repo app --static-only --runs-dir runs --quiet
           scan_code=$?
           set -e
           if [ "$scan_code" -ne 1 ]; then
-            echo "::error::Killer exited $scan_code scanning a vulnerable fixture, want 1 (findings)." >&2
+            echo "::error::Killer exited $scan_code scanning a vulnerable fixture with a scanner installed, want 1 (findings at or above the threshold)." >&2
             exit 1
           fi
 
-          run_dir="$(find runs -mindepth 1 -maxdepth 1 -type d | head -1)"
-          echo "run: $run_dir"
-          cd ..
+          run_dir="runs/$(ls runs | head -1)"
+          found="$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1]))['findings']))" "$run_dir/findings.json")"
+          echo "with osv-scanner: $found finding(s)"
+          if [ "$found" -eq 0 ]; then
+            echo "::error::No findings with a scanner installed; this step asserts nothing." >&2
+            exit 1
+          fi
 
-          # Exit 1 means "findings are still open", which is correct here.
-          # Asserting the exact code matters: exit 3 would mean the contract
-          # was refused, which is the failure this job exists to catch, and
-          # a loose check would read it as success.
+          cd ..
+          # Exactly 1. Exit 3 would mean the contract was refused, which is
+          # the failure this job exists to catch, and a loose check reads it
+          # as success.
           set +e
           ./bin/vibegiver inspect ".work/$run_dir"
           code=$?
@@ -149,7 +206,7 @@ jobs:
       - name: the envelope a live Killer writes is the one this build expects
         run: |
           set -euo pipefail
-          run_dir="$(find .work/runs -mindepth 1 -maxdepth 1 -type d | head -1)"
+          run_dir=".work/runs/$(ls .work/runs | head -1)"
           live="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['schema_version'])" "$run_dir/findings.json")"
           expected="$(./bin/vibegiver contract | awk '/^Envelope schema_version/ {print $3}')"
           echo "live Killer wrote: $live"
@@ -162,7 +219,7 @@ jobs:
       - name: a newer envelope is refused, not read
         run: |
           set -euo pipefail
-          run_dir="$(find .work/runs -mindepth 1 -maxdepth 1 -type d | head -1)"
+          run_dir=".work/runs/$(ls .work/runs | head -1)"
           mkdir -p .work/forged
           python3 - "$run_dir/findings.json" .work/forged/findings.json <<'PY'
           import json, sys

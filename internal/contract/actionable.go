@@ -146,6 +146,33 @@ func (r NonCoverageReport) Silent() bool {
 	return r.Trust == CoverageReported && len(r.Skipped) == 0 && len(r.Failed) == 0
 }
 
+// EstablishesClean reports whether this run is entitled to the conclusion
+// that there is nothing here to fix.
+//
+// Both halves are required, and the second is the one that is easy to omit:
+// no finding Giver would act on, AND a run that actually looked. Zero
+// findings on its own means nothing.
+//
+// This is not hypothetical tidiness. The first CI run of the round-trip job
+// measured it: on a bare runner with no Semgrep, no osv-scanner and no
+// gitleaks, Vibe Killer scanned a deliberately vulnerable Flask fixture,
+// reported "No findings from the checks that ran", listed all fourteen checks
+// as skipped, and exited 0 -- its success code. Everything about that output
+// reads as a clean bill except the coverage section. A consumer that gated on
+// the finding count and the exit code would have declared a known-vulnerable
+// application secure, on real infrastructure, with nothing misconfigured.
+func (d *Document) EstablishesClean() bool {
+	if !d.NonCoverage().Silent() {
+		return false
+	}
+	for _, t := range TriageDocument(d) {
+		if t.Disposition != DispositionNotOpen {
+			return false
+		}
+	}
+	return true
+}
+
 // Summary is one line for the top of a report.
 func (r NonCoverageReport) Summary() string {
 	if r.Trust == CoverageUnknown {

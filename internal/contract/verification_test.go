@@ -457,6 +457,62 @@ func TestTriageRejectsWhatItMust(t *testing.T) {
 	})
 }
 
+// TestZeroFindingsIsNotCleanUnlessSomethingLooked encodes the case the first
+// round-trip CI run produced on real infrastructure: a bare runner with no
+// scanners installed, a deliberately vulnerable fixture, zero findings, every
+// check skipped, and Killer's own exit 0.
+func TestZeroFindingsIsNotCleanUnlessSomethingLooked(t *testing.T) {
+	// What that runner actually wrote, in miniature: nothing found, because
+	// nothing ran.
+	nothingLooked := &Document{
+		SchemaVersion: DocumentSchemaVersion,
+		RunID:         "bare-runner",
+		Skipped: []SkippedCheck{
+			{CheckID: "engine.semgrep", Layer: "static", Reason: "semgrep is not installed or not on PATH"},
+			{CheckID: "engine.osv-scanner", Layer: "deps", Reason: "osv-scanner is not installed or not on PATH"},
+			{CheckID: "engine.gitleaks", Layer: "secrets", Reason: "gitleaks is not installed or not on PATH"},
+		},
+	}
+	if nothingLooked.EstablishesClean() {
+		t.Fatal("a run that found nothing because nothing ran was reported as clean; this is the " +
+			"output a bare CI runner produces from a known-vulnerable application")
+	}
+
+	// A check that ran and broke is the same conclusion by another route.
+	checkBroke := &Document{
+		SchemaVersion: DocumentSchemaVersion,
+		RunID:         "broken",
+		Failed:        []FailedCheck{{CheckID: "engine.semgrep", Layer: "static", Error: "exit status 7"}},
+	}
+	if checkBroke.EstablishesClean() {
+		t.Error("a run whose scanner crashed was reported as clean")
+	}
+
+	// And the one case that is genuinely clean: nothing skipped, nothing
+	// failed, nothing found. Without this the test above would pass for a
+	// function that always returned false.
+	everythingRan := &Document{SchemaVersion: DocumentSchemaVersion, RunID: "complete"}
+	if !everythingRan.EstablishesClean() {
+		t.Error("a complete run with no findings should be clean; otherwise nothing ever is")
+	}
+
+	// A complete run that still has an open finding is not clean either.
+	withFinding := &Document{
+		SchemaVersion: DocumentSchemaVersion,
+		RunID:         "complete-but-open",
+		Findings:      []Finding{fixedFinding()},
+	}
+	if withFinding.EstablishesClean() {
+		t.Error("a run with an open attemptable finding was reported as clean")
+	}
+
+	// The real corpus: 53 findings and 11 skipped checks. Not clean twice
+	// over.
+	if loadReal(t).EstablishesClean() {
+		t.Error("the real run was reported as clean")
+	}
+}
+
 // TestLoadRefusesASecretsFindingMarkedFixable guards the one rewrite that
 // would be actively harmful: an edit that hides a credential while it stays
 // valid reads as a fix.
