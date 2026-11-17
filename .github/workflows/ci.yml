@@ -97,6 +97,15 @@ jobs:
           ref: v1.0.0
           path: .killer
 
+      # Built, not `go run`. `go run` reports its own exit 1 for any non-zero
+      # exit of the program it runs -- it prints "exit status 3" and exits 1 --
+      # so every assertion on an exact exit code below would be checking go
+      # run's code instead of Giver's. That is how the refusal assertion first
+      # failed here while the refusal itself was working perfectly, and a
+      # `|| [ $? -eq 1 ]` through go run would have passed on exit 3 too.
+      - name: build the binary the assertions run
+        run: go build -o bin/vibegiver ./cmd/vibegiver
+
       - name: scan a vulnerable fixture and read the result
         run: |
           set -euo pipefail
@@ -111,22 +120,38 @@ jobs:
           # Exit 1 is the expected outcome on a deliberately vulnerable
           # fixture: an open finding at or above the severity threshold.
           cd .work
-          vibekiller scan --repo app --static-only --runs-dir runs --quiet || [ $? -eq 1 ]
+          set +e
+          vibekiller scan --repo app --static-only --runs-dir runs --quiet
+          scan_code=$?
+          set -e
+          if [ "$scan_code" -ne 1 ]; then
+            echo "::error::Killer exited $scan_code scanning a vulnerable fixture, want 1 (findings)." >&2
+            exit 1
+          fi
 
           run_dir="$(find runs -mindepth 1 -maxdepth 1 -type d | head -1)"
           echo "run: $run_dir"
-
-          # Exit 1 means "findings are still open", which is correct here and
-          # is not a failure of this job.
           cd ..
-          go run ./cmd/vibegiver inspect ".work/$run_dir" || [ $? -eq 1 ]
+
+          # Exit 1 means "findings are still open", which is correct here.
+          # Asserting the exact code matters: exit 3 would mean the contract
+          # was refused, which is the failure this job exists to catch, and
+          # a loose check would read it as success.
+          set +e
+          ./bin/vibegiver inspect ".work/$run_dir"
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "::error::inspect exited $code on a run with open findings, want 1." >&2
+            exit 1
+          fi
 
       - name: the envelope a live Killer writes is the one this build expects
         run: |
           set -euo pipefail
           run_dir="$(find .work/runs -mindepth 1 -maxdepth 1 -type d | head -1)"
           live="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['schema_version'])" "$run_dir/findings.json")"
-          expected="$(go run ./cmd/vibegiver contract | awk '/^Envelope schema_version/ {print $3}')"
+          expected="$(./bin/vibegiver contract | awk '/^Envelope schema_version/ {print $3}')"
           echo "live Killer wrote: $live"
           echo "this build expects: $expected"
           if [ "$live" != "$expected" ]; then
@@ -146,9 +171,11 @@ jobs:
           json.dump(d, open(sys.argv[2], "w"), indent=2)
           PY
           # A guard that cannot fail is not a guard, so the refusal is
-          # exercised rather than assumed. Exit 3 is ExitRefused.
+          # exercised rather than assumed. Exit 3 is ExitRefused, and it has
+          # to be exactly 3: exit 1 would mean the document was read and
+          # merely had open findings in it.
           set +e
-          go run ./cmd/vibegiver inspect .work/forged/findings.json
+          ./bin/vibegiver inspect .work/forged/findings.json
           code=$?
           set -e
           if [ "$code" -ne 3 ]; then

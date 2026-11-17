@@ -154,6 +154,28 @@ Measured against the published v1.0.0 binary. Re-measure on any version bump.
   `regressed`, `unchecked` — not the `inconclusive` the brief names. Read run
   directories directly rather than parsing that output.
 
+## `go run` destroys the exit code
+
+Never assert an exit code through `go run`. It reports **its own** exit 1 for
+any non-zero exit of the program it runs, printing `exit status 3` to stderr
+while exiting 1 itself. Measured:
+
+```
+./bin/vibegiver inspect forged.json   -> 3
+go run ./cmd/vibegiver inspect forged.json -> 1
+```
+
+This matters here more than in most projects, because the whole point of
+having four exit codes is that a pipeline can tell "something is still open"
+(1) from "the contract was refused" (3) from "it broke" (2). Through `go run`
+they are all 1, so a gate that looks discriminating is not.
+
+It already cost one CI failure: the refusal assertion failed while the refusal
+itself was working perfectly. Worse, a loose `|| [ $? -eq 1 ]` through `go run`
+**passes on exit 3 as well**, so the step before it was asserting nothing. CI
+builds the binary once and runs that. Keep it that way, and prefer an exact
+`-ne` check over `||` on any step that cares which way it failed.
+
 ## Shell scripting
 
 Inherited from Killer, and re-confirmed here: heredoc'd Python and shell inside

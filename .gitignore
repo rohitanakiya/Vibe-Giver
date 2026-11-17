@@ -6,3 +6,8 @@
 
 # Run artifacts: every fix attempt's logs, patches and verification output.
 /runs/
+
+# CI builds the binary here rather than using `go run`, which collapses every
+# non-zero exit code to 1 and so hides the difference between "still open" and
+# "contract refused".
+/bin/
