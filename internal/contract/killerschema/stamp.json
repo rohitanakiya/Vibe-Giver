@@ -1,0 +1,13 @@
+{
+  "source_repo": "github.com/rohitanakiya/Vibe-Killer",
+  "source_path": "schema/finding.schema.json",
+  "pinned_tag": "v1.0.0",
+  "pinned_commit": "fbe32e04f803a430b530832e84ea0c504b7b53a4",
+  "sha256": "0d78219ce7f7538b2e4013b1a0e02b6113a4599b2b28427be20721f7a6734ae3",
+  "vendored_at": "2026-11-18",
+  "vendored_from": "the module proxy artifact for github.com/rohitanakiya/Vibe-Killer@v1.0.0, not a working tree",
+  "finding_schema_version": "1.0",
+  "document_schema_version": "1.2",
+  "document_schema_versions_killer_reads": ["1.0", "1.1", "1.2"],
+  "note": "The per-finding schema above is published. The findings.json ENVELOPE is not: Document, and with it the skipped[]/failed[] arrays Giver depends on, exists only in Killer's internal/finding/finding.go. See envelope.go for how that unpublished half is bound."
+}

@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  schedule:
+    # The contract this tool consumes lives in another repository, so a weekly
+    # run is what notices that the pinned Killer artifact moved while nothing
+    # here changed. A green build on a stale contract is the failure mode.
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build, vet and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "these files are not gofmt clean:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+      - name: go test
+        run: go test -race ./...
+
+  contract:
+    name: contract binding
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # The vendored schema is a copy, so something has to notice when the
+      # upstream contract moves. This fetches Killer's schema at the pinned
+      # commit and compares hashes. It is the anti-drift property a submodule
+      # would have given, without a submodule shipping an empty directory to
+      # anyone who runs `go install`.
+      - name: schema has not drifted from the pinned Killer release
+        run: bash scripts/schema-drift-check.sh
+
+      - name: the CLI reports its binding
+        run: go run ./cmd/vibegiver contract
+
+  round-trip:
+    name: round trip against a live Killer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # The committed corpus was produced by this exact binary, and a corpus
+      # is a photograph: it cannot notice that the producer changed. So the
+      # pinned Killer is installed and run here, and the document it writes
+      # today is fed through the same loader.
+      #
+      # This is the job that would have caught the stale envelope version on
+      # its own, with no document to compare against: the brief and the
+      # roadmap both said 1.1, and a real run says 1.2.
+      - name: install the pinned Vibe Killer
+        run: |
+          go install github.com/rohitanakiya/Vibe-Killer/cmd/vibekiller@v1.0.0
+          vibekiller --version
+
+      - name: check out Killer's fixtures
+        uses: actions/checkout@v4
+        with:
+          repository: rohitanakiya/Vibe-Killer
+          ref: v1.0.0
+          path: .killer
+
+      - name: scan a vulnerable fixture and read the result
+        run: |
+          set -euo pipefail
+          mkdir -p .work
+          cp -r .killer/fixtures/flask-vulnerable .work/app
+          (cd .work/app && vibekiller init)
+
+          # --static-only never schedules the endpoint, runtime or exposure
+          # layers, so the document carries both findings and a populated
+          # skipped[]. Both halves of the contract in one artifact.
+          #
+          # Exit 1 is the expected outcome on a deliberately vulnerable
+          # fixture: an open finding at or above the severity threshold.
+          cd .work
+          vibekiller scan --repo app --static-only --runs-dir runs --quiet || [ $? -eq 1 ]
+
+          run_dir="$(find runs -mindepth 1 -maxdepth 1 -type d | head -1)"
+          echo "run: $run_dir"
+
+          # Exit 1 means "findings are still open", which is correct here and
+          # is not a failure of this job.
+          cd ..
+          go run ./cmd/vibegiver inspect ".work/$run_dir" || [ $? -eq 1 ]
+
+      - name: the envelope a live Killer writes is the one this build expects
+        run: |
+          set -euo pipefail
+          run_dir="$(find .work/runs -mindepth 1 -maxdepth 1 -type d | head -1)"
+          live="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['schema_version'])" "$run_dir/findings.json")"
+          expected="$(go run ./cmd/vibegiver contract | awk '/^Envelope schema_version/ {print $3}')"
+          echo "live Killer wrote: $live"
+          echo "this build expects: $expected"
+          if [ "$live" != "$expected" ]; then
+            echo "::error::The envelope moved. A live Killer writes $live and this build is written against $expected." >&2
+            exit 1
+          fi
+
+      - name: a newer envelope is refused, not read
+        run: |
+          set -euo pipefail
+          run_dir="$(find .work/runs -mindepth 1 -maxdepth 1 -type d | head -1)"
+          mkdir -p .work/forged
+          python3 - "$run_dir/findings.json" .work/forged/findings.json <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          d["schema_version"] = "99.0"
+          json.dump(d, open(sys.argv[2], "w"), indent=2)
+          PY
+          # A guard that cannot fail is not a guard, so the refusal is
+          # exercised rather than assumed. Exit 3 is ExitRefused.
+          set +e
+          go run ./cmd/vibegiver inspect .work/forged/findings.json
+          code=$?
+          set -e
+          if [ "$code" -ne 3 ]; then
+            echo "::error::An envelope from the future exited $code, want 3 (refused)." >&2
+            exit 1
+          fi
+          echo "refused with exit 3, as intended"

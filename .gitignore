@@ -1,0 +1,8 @@
+# Build output. Named exactly, because a bare /vibegiver would also exclude a
+# directory of that name -- Vibe Killer came one slash from excluding its own
+# embedded rule pack this way, and the binary it published had no rules in it.
+/vibegiver
+/vibegiver.exe
+
+# Run artifacts: every fix attempt's logs, patches and verification output.
+/runs/

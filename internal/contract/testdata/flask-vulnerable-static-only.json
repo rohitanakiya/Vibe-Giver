@@ -1,0 +1,2403 @@
+{
+  "schema_version": "1.2",
+  "run_id": "20261117-231333-382284",
+  "generated_at": "2026-11-17T23:13:48Z",
+  "repo_path": "fixtures/flask-vulnerable",
+  "counts": {
+    "total": 53,
+    "by_severity": {
+      "critical": 4,
+      "high": 8,
+      "medium": 41
+    },
+    "by_source": {
+      "deps": 42,
+      "sast": 11
+    },
+    "confirmed": 0
+  },
+  "findings": [
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-3d592f804989",
+      "rule_id": "auth.jwt-not-verified",
+      "title": "This decodes a JWT without verifying its signature, so the claims are client-controlled and any identity in them is self-asserted",
+      "category": "identification-and-authentication-failure",
+      "cwe": "CWE-347",
+      "severity": "critical",
+      "confidence": "likely",
+      "source": "sast",
+      "location": {
+        "type": "code",
+        "file": "app.py",
+        "line": 243,
+        "end_line": 243
+      },
+      "evidence": {
+        "summary": "This decodes a JWT without verifying its signature, so the claims are client-controlled and any identity in them is self-asserted.",
+        "snippet": "requires login",
+        "evidence_key": "semgrep:jwt-decoded-without-verification-python"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Open app.py at line 243.",
+          "The flagged pattern is the one described in the evidence summary."
+        ]
+      },
+      "remediation": {
+        "guidance": "Call jwt.decode with the key and algorithms set, and leave verification on. If a test needs an unverified decode, keep that in the test, not in the request path.",
+        "root_cause_hint": "Signature verification was switched off, usually to get past an error during development.",
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 5.72,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-c58729e0f12e",
+      "rule_id": "injection.command-built-from-input",
+      "title": "A shell command is built from a request value",
+      "category": "injection",
+      "cwe": "CWE-78",
+      "severity": "critical",
+      "confidence": "likely",
+      "source": "sast",
+      "location": {
+        "type": "code",
+        "file": "app.py",
+        "line": 232,
+        "end_line": 232
+      },
+      "evidence": {
+        "summary": "A shell command is built from a request value. The shell interprets metacharacters, so a caller can append their own command.",
+        "snippet": "requires login",
+        "evidence_key": "semgrep:shell-command-built-from-input-python"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Open app.py at line 232.",
+          "The flagged pattern is the one described in the evidence summary."
+        ]
+      },
+      "remediation": {
+        "guidance": "Drop shell=True and pass a list of arguments, for example subprocess.run([\"convert\", src, dst], check=True), and validate the value against an allowlist.",
+        "root_cause_hint": "shell=True hands the assembled string to a shell, which parses the request value as syntax.",
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 5.72,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-4b191786178d",
+      "rule_id": "injection.sql-string-built-from-input",
+      "title": "A SQL statement is built with string formatting from a request value",
+      "category": "injection",
+      "cwe": "CWE-89",
+      "severity": "critical",
+      "confidence": "likely",
+      "source": "sast",
+      "location": {
+        "type": "code",
+        "file": "app.py",
+        "line": 202,
+        "end_line": 202
+      },
+      "evidence": {
+        "summary": "A SQL statement is built with string formatting from a request value. The value becomes part of the statement, so a caller controls the query.",
+        "snippet": "requires login",
+        "evidence_key": "semgrep:sql-built-by-string-formatting-python"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Open app.py at line 202.",
+          "The flagged pattern is the one described in the evidence summary."
+        ]
+      },
+      "remediation": {
+        "guidance": "Pass the value as a bound parameter instead, for example cursor.execute(\"SELECT * FROM orders WHERE id = %s\", (order_id,)), or use the ORM's filter API. Note that the comma matters: passing a tuple is parameterization, while % formatting is not.",
+        "root_cause_hint": "The query is assembled with f-strings, % or .format(), so the value is interpolated into the statement's syntax.",
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 5.72,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-47f8f97a0b2c",
+      "rule_id": "misconfig.debug-mode-enabled",
+      "title": "Debug mode is enabled",
+      "category": "security-misconfiguration",
+      "cwe": "CWE-489",
+      "severity": "critical",
+      "confidence": "likely",
+      "source": "sast",
+      "location": {
+        "type": "code",
+        "file": "app.py",
+        "line": 277,
+        "end_line": 277
+      },
+      "evidence": {
+        "summary": "Debug mode is enabled. In Flask this exposes an interactive console on error pages, which allows code execution; in Django it returns settings and query contents in error responses.",
+        "snippet": "requires login",
+        "evidence_key": "semgrep:debug-mode-enabled"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Open app.py at line 277.",
+          "The flagged pattern is the one described in the evidence summary."
+        ]
+      },
+      "remediation": {
+        "guidance": "Drive this from configuration and default it off, for example debug=os.environ.get(\"FLASK_DEBUG\") == \"1\". The interactive debugger must never be reachable on a deployed instance.",
+        "root_cause_hint": "A development convenience is set unconditionally rather than from the environment.",
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 5.72,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-c98036b8474e",
+      "rule_id": "authz.mass-assignment",
+      "title": "The whole request body is written into a record",
+      "category": "broken-access-control",
+      "cwe": "CWE-915",
+      "severity": "high",
+      "confidence": "likely",
+      "source": "sast",
+      "location": {
+        "type": "code",
+        "file": "app.py",
+        "line": 189,
+        "end_line": 189
+      },
+      "evidence": {
+        "summary": "The whole request body is written into a record. A caller can set any field the model accepts, including ones the UI never exposes, such as role, is_admin, owner_id or balance.",
+        "snippet": "requires login",
+        "evidence_key": "semgrep:mass-assignment-request-body-python"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Open app.py at line 189.",
+          "The flagged pattern is the one described in the evidence summary."
+        ]
+      },
+      "remediation": {
+        "guidance": "Pick the permitted fields explicitly before writing, for example order = {\"item\": payload[\"item\"]}, and never pass the request body or a permissive model's dump straight into an update or create call.",
+        "root_cause_hint": "The write path trusts the shape of the request body instead of selecting the fields it is willing to accept.",
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 2.86,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-4a73833a6d63",
+      "rule_id": "crypto.password-fast-digest",
+      "title": "A password is being hashed with a general-purpose digest",
+      "category": "cryptographic-failure",
+      "cwe": "CWE-916",
+      "severity": "high",
+      "confidence": "likely",
+      "source": "sast",
+      "location": {
+        "type": "code",
+        "file": "app.py",
+        "line": 258,
+        "end_line": 258
+      },
+      "evidence": {
+        "summary": "A password is being hashed with a general-purpose digest. These are built to be fast, which is the opposite of what password storage needs: an attacker with the hash list can try candidates at enormous rates.",
+        "snippet": "requires login",
+        "evidence_key": "semgrep:password-hashed-with-fast-digest"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Open app.py at line 258.",
+          "The flagged pattern is the one described in the evidence summary."
+        ]
+      },
+      "remediation": {
+        "guidance": "Use a password hashing function with a work factor, such as argon2id, scrypt or bcrypt, through a library that salts each password. Migrate existing hashes by re-hashing on next successful login.",
+        "root_cause_hint": "A hash function was chosen for availability rather than for deliberate slowness and per-password salting.",
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 2.86,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-412041504e8f",
+      "rule_id": "crypto.predictable-token",
+      "title": "A security-relevant value is being generated from a non-cryptographic random source",
+      "category": "cryptographic-failure",
+      "cwe": "CWE-338",
+      "severity": "high",
+      "confidence": "likely",
+      "source": "sast",
+      "location": {
+        "type": "code",
+        "file": "app.py",
+        "line": 251,
+        "end_line": 251
+      },
+      "evidence": {
+        "summary": "A security-relevant value is being generated from a non-cryptographic random source. These generators are seeded predictably and their output can be reproduced, so the token can be guessed.",
+        "snippet": "requires login",
+        "evidence_key": "semgrep:predictable-randomness-for-security-value"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Open app.py at line 251.",
+          "The flagged pattern is the one described in the evidence summary."
+        ]
+      },
+      "remediation": {
+        "guidance": "Generate the value with a cryptographic source, for example crypto.randomBytes(32).toString(\"hex\") or secrets.token_urlsafe(32).",
+        "root_cause_hint": "The convenient random function was used where a cryptographic one is required.",
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 2.86,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-2f465dd0b8be",
+      "rule_id": "idor.missing-ownership-check",
+      "title": "This view looks up a record by an identifier taken from the request URL without scoping the query to the current user",
+      "category": "broken-access-control",
+      "cwe": "CWE-639",
+      "severity": "high",
+      "confidence": "likely",
+      "source": "sast",
+      "location": {
+        "type": "code",
+        "file": "app.py",
+        "line": 175,
+        "end_line": 180
+      },
+      "evidence": {
+        "summary": "This view looks up a record by an identifier taken from the request URL without scoping the query to the current user. Any authenticated caller can read another user's record by changing the id.",
+        "snippet": "requires login",
+        "evidence_key": "semgrep:idor-missing-ownership-check-python"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Open app.py at line 175.",
+          "The flagged pattern is the one described in the evidence summary."
+        ]
+      },
+      "remediation": {
+        "guidance": "Filter the query by the current user as well as the id, for example Order.query.filter_by(id=order_id, user_id=current_user.id) .first_or_404(), so a record belonging to someone else is simply not found.",
+        "root_cause_hint": "The query is keyed only on a path parameter, so the record's owner is never part of the lookup.",
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 2.86,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-d19263a87798",
+      "rule_id": "misconfig.cors-credentialed-wildcard",
+      "title": "The response reflects the request's Origin header while allowing credentials, which permits any site to make credentialed calls to this API on a user's behalf",
+      "category": "security-misconfiguration",
+      "cwe": "CWE-942",
+      "severity": "high",
+      "confidence": "likely",
+      "source": "sast",
+      "location": {
+        "type": "code",
+        "file": "app.py",
+        "line": 104,
+        "end_line": 104
+      },
+      "evidence": {
+        "summary": "The response reflects the request's Origin header while allowing credentials, which permits any site to make credentialed calls to this API on a user's behalf.",
+        "snippet": "requires login",
+        "evidence_key": "semgrep:cors-origin-reflected-python"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Open app.py at line 104.",
+          "The flagged pattern is the one described in the evidence summary."
+        ]
+      },
+      "remediation": {
+        "guidance": "Configure an explicit list of allowed origins, for example with flask-cors' origins parameter, and do not echo the Origin header.",
+        "root_cause_hint": "The allowed origin is taken from the request instead of from configuration.",
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 2.86,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-de3542446bc5",
+      "rule_id": "ssrf.user-supplied-url-fetched",
+      "title": "The server fetches a caller-supplied URL, so requests originate from inside your network and can reach internal services and instance metadata",
+      "category": "server-side-request-forgery",
+      "cwe": "CWE-918",
+      "severity": "high",
+      "confidence": "likely",
+      "source": "sast",
+      "location": {
+        "type": "code",
+        "file": "app.py",
+        "line": 222,
+        "end_line": 222
+      },
+      "evidence": {
+        "summary": "The server fetches a caller-supplied URL, so requests originate from inside your network and can reach internal services and instance metadata.",
+        "snippet": "requires login",
+        "evidence_key": "semgrep:unsafe-fetch-of-user-supplied-url-python"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Open app.py at line 222.",
+          "The flagged pattern is the one described in the evidence summary."
+        ]
+      },
+      "remediation": {
+        "guidance": "Restrict fetches to an allowlist of hosts, resolve the name and reject private, loopback and link-local addresses, and re-check on every redirect.",
+        "root_cause_hint": "The URL is taken from the request and fetched without resolving and checking the destination address.",
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 2.86,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-0520b6a42d2a",
+      "rule_id": "traversal.path-built-from-input",
+      "title": "A filesystem path is built from a request value without being confined to an intended directory, so a caller can traverse out of it",
+      "category": "broken-access-control",
+      "cwe": "CWE-22",
+      "severity": "high",
+      "confidence": "likely",
+      "source": "sast",
+      "location": {
+        "type": "code",
+        "file": "app.py",
+        "line": 212,
+        "end_line": 212
+      },
+      "evidence": {
+        "summary": "A filesystem path is built from a request value without being confined to an intended directory, so a caller can traverse out of it.",
+        "snippet": "requires login",
+        "evidence_key": "semgrep:path-built-from-request-value-python"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Open app.py at line 212.",
+          "The flagged pattern is the one described in the evidence summary."
+        ]
+      },
+      "remediation": {
+        "guidance": "Resolve the path and confirm it is still under the intended root, for example with Path(root).joinpath(name).resolve() followed by an is_relative_to(root) check, or use send_from_directory, which performs that check for you.",
+        "root_cause_hint": "os.path.join with an absolute or dot-dot segment discards the base directory entirely.",
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 2.86,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-149038f52fec",
+      "rule_id": "deps.known-vulnerability",
+      "title": "pyjwt 1.7.1: PyJWT: HS256/384/512 verify accepts empty HMAC key via oct JWK (PyJWK/PyJWKClient) enabling token forgery",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "high",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "pyjwt",
+        "ecosystem": "PyPI",
+        "version": "1.7.1"
+      },
+      "evidence": {
+        "summary": "pyjwt 1.7.1 is affected by GHSA-pxh4-856f-4h89. PyJWT: HS256/384/512 verify accepts empty HMAC key via oct JWK (PyJWK/PyJWKClient) enabling token forgery",
+        "observed": "pyjwt resolves to 1.7.1 in requirements.txt",
+        "expected": "at least 2.14.0",
+        "evidence_key": "osv:GHSA-pxh4-856f-4h89"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe pyjwt at version 1.7.1.",
+          "Compare against advisory GHSA-pxh4-856f-4h89."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade pyjwt to 2.14.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/GHSA-pxh4-856f-4h89"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 2.6,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-00428d26c093",
+      "rule_id": "deps.known-vulnerability",
+      "title": "urllib3 1.26.9: urllib3 redirects are not disabled when retries are disabled on PoolManager instantiation",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "urllib3",
+        "ecosystem": "PyPI",
+        "version": "1.26.9"
+      },
+      "evidence": {
+        "summary": "urllib3 1.26.9 is affected by PYSEC-2026-1999, GHSA-pq67-6m6q-mj2v. urllib3 redirects are not disabled when retries are disabled on PoolManager instantiation",
+        "observed": "urllib3 resolves to 1.26.9 in requirements.txt",
+        "expected": "at least 2.5.0",
+        "evidence_key": "osv:PYSEC-2026-1999"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe urllib3 at version 1.26.9.",
+          "Compare against advisory PYSEC-2026-1999."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade urllib3 to 2.5.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-1999",
+          "https://nvd.nist.gov/vuln/detail/CVE-2025-50181",
+          "https://github.com/advisories/GHSA-pq67-6m6q-mj2v"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-01238806a820",
+      "rule_id": "deps.known-vulnerability",
+      "title": "pyjwt 1.7.1 has a known vulnerability (PYSEC-2026-179)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "pyjwt",
+        "ecosystem": "PyPI",
+        "version": "1.7.1"
+      },
+      "evidence": {
+        "summary": "pyjwt 1.7.1 is affected by PYSEC-2026-179, GHSA-xgmm-8j9v-c9wx. PyJWT is a JSON Web Token implementation in Python. Prior to 2.13.0, when the verifier is decoding JSON Web Tokens, while supporting both asymmetric and HMAC algorithms, the library does not validate use of JSON Web Keys in HMAC algorithm, allowing attacker to use the issuer public key as the secret key for HMAC algorithm. This vulnerability is fixed in 2.13.0.",
+        "observed": "pyjwt resolves to 1.7.1 in requirements.txt",
+        "expected": "at least 2.13.0",
+        "evidence_key": "osv:PYSEC-2026-179"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe pyjwt at version 1.7.1.",
+          "Compare against advisory PYSEC-2026-179."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade pyjwt to 2.13.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-179"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-1342a91ae5c4",
+      "rule_id": "deps.known-vulnerability",
+      "title": "urllib3 1.26.9: urllib3: HTTPResponse.stream()/read_chunked() buffers an unbounded chunk-size line into memory",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "urllib3",
+        "ecosystem": "PyPI",
+        "version": "1.26.9"
+      },
+      "evidence": {
+        "summary": "urllib3 1.26.9 is affected by PYSEC-2026-4177, GHSA-vxq7-64xx-v4gw. urllib3: HTTPResponse.stream()/read_chunked() buffers an unbounded chunk-size line into memory",
+        "observed": "urllib3 resolves to 1.26.9 in requirements.txt",
+        "expected": "at least 2.8.0",
+        "evidence_key": "osv:PYSEC-2026-4177"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe urllib3 at version 1.26.9.",
+          "Compare against advisory PYSEC-2026-4177."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade urllib3 to 2.8.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-4177",
+          "https://nvd.nist.gov/vuln/detail/CVE-2026-97689",
+          "https://github.com/advisories/GHSA-vxq7-64xx-v4gw"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-1374d6af87e0",
+      "rule_id": "deps.known-vulnerability",
+      "title": "urllib3 1.26.9 has a known vulnerability (PYSEC-2023-192)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "urllib3",
+        "ecosystem": "PyPI",
+        "version": "1.26.9"
+      },
+      "evidence": {
+        "summary": "urllib3 1.26.9 is affected by PYSEC-2023-192, GHSA-v845-jxx5-vc9f. urllib3 is a user-friendly HTTP client library for Python. urllib3 doesn't treat the `Cookie` HTTP header special or provide any helpers for managing cookies over HTTP, that is the responsibility of the user. However, it is possible for a user to specify a `Cookie` header and unknowingly leak information via HTTP redirects to a different origin if that user doesn't disable redirects explicitly. This issue has been patched in urllib3 version 1.26.17 or 2.0.5.",
+        "observed": "urllib3 resolves to 1.26.9 in requirements.txt",
+        "expected": "at least 01220354d389cd05474713f8c982d05c9b17aafb",
+        "evidence_key": "osv:PYSEC-2023-192"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe urllib3 at version 1.26.9.",
+          "Compare against advisory PYSEC-2023-192."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade urllib3 to 01220354d389cd05474713f8c982d05c9b17aafb, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2023-192",
+          "https://github.com/urllib3/urllib3/security/advisories/GHSA-v845-jxx5-vc9f"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-1b1d2035717c",
+      "rule_id": "deps.known-vulnerability",
+      "title": "flask 2.0.1 has a known vulnerability (PYSEC-2023-62)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "flask",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "flask 2.0.1 is affected by PYSEC-2023-62, GHSA-m2qf-hxjv-5gpq. Flask is a lightweight WSGI web application framework. When all of the following conditions are met, a response containing data intended for one client may be cached and subsequently sent by the proxy to other clients. If the proxy also caches `Set-Cookie` headers, it may send one client's `session` cookie to other clients. The severity depends on the application's use of the session and the proxy's behavior regarding cookies. The risk depends on all these conditions being met.\n\n1. The applicati...",
+        "observed": "flask resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 2.2.5",
+        "evidence_key": "osv:PYSEC-2023-62"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe flask at version 2.0.1.",
+          "Compare against advisory PYSEC-2023-62."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade flask to 2.2.5, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2023-62",
+          "https://github.com/pallets/flask/security/advisories/GHSA-m2qf-hxjv-5gpq"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-265c723fd751",
+      "rule_id": "deps.known-vulnerability",
+      "title": "werkzeug 2.0.1 has a known vulnerability (PYSEC-2023-221)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "werkzeug",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "werkzeug 2.0.1 is affected by PYSEC-2023-221, GHSA-hrfv-mqp8-q5rw. Werkzeug is a comprehensive WSGI web application library. If an upload of a file that starts with CR or LF and then is followed by megabytes of data without these characters: all of these bytes are appended chunk by chunk into internal bytearray and lookup for boundary is performed on growing buffer. This allows an attacker to cause a denial of service by sending crafted multipart data to an endpoint that will parse it. The amount of CPU time required can block worker processes from handling leg...",
+        "observed": "werkzeug resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 2.3.8",
+        "evidence_key": "osv:PYSEC-2023-221"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe werkzeug at version 2.0.1.",
+          "Compare against advisory PYSEC-2023-221."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade werkzeug to 2.3.8, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2023-221",
+          "https://github.com/pallets/werkzeug/security/advisories/GHSA-hrfv-mqp8-q5rw"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-344bda7b55e9",
+      "rule_id": "deps.known-vulnerability",
+      "title": "pyjwt 1.7.1: PyJWT: Non-canonical signature segments enable raw-token revocation bypass",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "pyjwt",
+        "ecosystem": "PyPI",
+        "version": "1.7.1"
+      },
+      "evidence": {
+        "summary": "pyjwt 1.7.1 is affected by PYSEC-2026-4147, GHSA-hxm8-2xgr-2p9m. PyJWT: Non-canonical signature segments enable raw-token revocation bypass",
+        "observed": "pyjwt resolves to 1.7.1 in requirements.txt",
+        "expected": "at least 2.14.0",
+        "evidence_key": "osv:PYSEC-2026-4147"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe pyjwt at version 1.7.1.",
+          "Compare against advisory PYSEC-2026-4147."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade pyjwt to 2.14.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-4147",
+          "https://nvd.nist.gov/vuln/detail/CVE-2026-102269",
+          "https://github.com/advisories/GHSA-hxm8-2xgr-2p9m"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-35c72866489f",
+      "rule_id": "deps.known-vulnerability",
+      "title": "certifi 2026.7.22: certifi bundles emSign root CAs with compromised intermediate CA keys",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "certifi",
+        "ecosystem": "PyPI",
+        "version": "2026.7.22"
+      },
+      "evidence": {
+        "summary": "certifi 2026.7.22 is affected by PYSEC-2026-4320, GHSA-6q48-6c7w-9gw2. certifi bundles emSign root CAs with compromised intermediate CA keys",
+        "observed": "certifi resolves to 2026.7.22 in requirements.txt",
+        "expected": "at least 2026.10.18",
+        "evidence_key": "osv:PYSEC-2026-4320"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe certifi at version 2026.7.22.",
+          "Compare against advisory PYSEC-2026-4320."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade certifi to 2026.10.18, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-4320",
+          "https://github.com/advisories/GHSA-6q48-6c7w-9gw2"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-422c7063b164",
+      "rule_id": "deps.known-vulnerability",
+      "title": "requests 2.25.1 has a known vulnerability (PYSEC-2026-2275)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "requests",
+        "ecosystem": "PyPI",
+        "version": "2.25.1"
+      },
+      "evidence": {
+        "summary": "requests 2.25.1 is affected by PYSEC-2026-2275, GHSA-gc5v-m9x4-r6x2. Requests is a HTTP library. Prior to version 2.33.0, the `requests.utils.extract_zipped_paths()` utility function uses a predictable filename when extracting files from zip archives into the system temporary directory. If the target file already exists, it is reused without validation. A local attacker with write access to the temp directory could pre-create a malicious file that would be loaded in place of the legitimate one. Standard usage of the Requests library is not affected by this vulner...",
+        "observed": "requests resolves to 2.25.1 in requirements.txt",
+        "expected": "at least 2.33.0",
+        "evidence_key": "osv:PYSEC-2026-2275"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe requests at version 2.25.1.",
+          "Compare against advisory PYSEC-2026-2275."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade requests to 2.33.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-2275",
+          "https://github.com/psf/requests/releases/tag/v2.33.0",
+          "https://github.com/psf/requests/security/advisories/GHSA-gc5v-m9x4-r6x2"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-44eec89bc1fd",
+      "rule_id": "deps.known-vulnerability",
+      "title": "pyjwt 1.7.1: PyJWT: Asymmetric-PEM detection bypass: whitespace/line-ending-mutated public keys skip the HS/asymmetric confusion guar...",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "pyjwt",
+        "ecosystem": "PyPI",
+        "version": "1.7.1"
+      },
+      "evidence": {
+        "summary": "pyjwt 1.7.1 is affected by PYSEC-2026-4145, GHSA-ffc3-869f-jxw9. PyJWT: Asymmetric-PEM detection bypass: whitespace/line-ending-mutated public keys skip the HS/asymmetric confusion guard",
+        "observed": "pyjwt resolves to 1.7.1 in requirements.txt",
+        "expected": "at least 2.14.0",
+        "evidence_key": "osv:PYSEC-2026-4145"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe pyjwt at version 1.7.1.",
+          "Compare against advisory PYSEC-2026-4145."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade pyjwt to 2.14.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-4145",
+          "https://nvd.nist.gov/vuln/detail/CVE-2026-102268",
+          "https://github.com/advisories/GHSA-ffc3-869f-jxw9"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-4d1809dedf45",
+      "rule_id": "deps.known-vulnerability",
+      "title": "urllib3 1.26.9: urllib3: HTTPS proxy TLS configuration may be ignored or overridden",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "urllib3",
+        "ecosystem": "PyPI",
+        "version": "1.26.9"
+      },
+      "evidence": {
+        "summary": "urllib3 1.26.9 is affected by PYSEC-2026-4175, GHSA-8988-9cw3-xx77. urllib3: HTTPS proxy TLS configuration may be ignored or overridden",
+        "observed": "urllib3 resolves to 1.26.9 in requirements.txt",
+        "expected": "at least 2.8.0",
+        "evidence_key": "osv:PYSEC-2026-4175"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe urllib3 at version 1.26.9.",
+          "Compare against advisory PYSEC-2026-4175."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade urllib3 to 2.8.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-4175",
+          "https://nvd.nist.gov/vuln/detail/CVE-2026-97687",
+          "https://github.com/advisories/GHSA-8988-9cw3-xx77"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-4fbd75aaf724",
+      "rule_id": "deps.known-vulnerability",
+      "title": "werkzeug 2.0.1: Werkzeug safe_join() allows Windows special device names",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "werkzeug",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "werkzeug 2.0.1 is affected by PYSEC-2026-4312, GHSA-g6x2-hccm-hh4m. Werkzeug safe_join() allows Windows special device names",
+        "observed": "werkzeug resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 3.1.9",
+        "evidence_key": "osv:PYSEC-2026-4312"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe werkzeug at version 2.0.1.",
+          "Compare against advisory PYSEC-2026-4312."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade werkzeug to 3.1.9, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-4312",
+          "https://nvd.nist.gov/vuln/detail/CVE-2026-102598",
+          "https://github.com/advisories/GHSA-g6x2-hccm-hh4m"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-57ec1e299d24",
+      "rule_id": "deps.known-vulnerability",
+      "title": "pyjwt 1.7.1: PyJWT: PyJWKClient follows redirects when fetching JWKS",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "pyjwt",
+        "ecosystem": "PyPI",
+        "version": "1.7.1"
+      },
+      "evidence": {
+        "summary": "pyjwt 1.7.1 is affected by PYSEC-2026-4144, GHSA-9v7f-9g4p-ffgj. PyJWT: PyJWKClient follows redirects when fetching JWKS",
+        "observed": "pyjwt resolves to 1.7.1 in requirements.txt",
+        "expected": "at least 2.14.0",
+        "evidence_key": "osv:PYSEC-2026-4144"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe pyjwt at version 1.7.1.",
+          "Compare against advisory PYSEC-2026-4144."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade pyjwt to 2.14.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-4144",
+          "https://nvd.nist.gov/vuln/detail/CVE-2026-102267",
+          "https://github.com/advisories/GHSA-9v7f-9g4p-ffgj"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-5fb89a8be460",
+      "rule_id": "deps.known-vulnerability",
+      "title": "pyjwt 1.7.1 has a known vulnerability (PYSEC-2025-183)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "pyjwt",
+        "ecosystem": "PyPI",
+        "version": "1.7.1"
+      },
+      "evidence": {
+        "summary": "pyjwt 1.7.1 is affected by PYSEC-2025-183. pyjwt v2.10.1 was discovered to contain weak encryption. NOTE: this is disputed by the Supplier because the key length is chosen by the application that uses the library (admittedly, library users may benefit from a minimum value and a mechanism for opting in to strict enforcement).",
+        "observed": "pyjwt resolves to 1.7.1 in requirements.txt",
+        "expected": "a version not covered by this advisory",
+        "evidence_key": "osv:PYSEC-2025-183"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe pyjwt at version 1.7.1.",
+          "Compare against advisory PYSEC-2025-183."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade pyjwt to a version this advisory does not cover, or remove the dependency.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2025-183"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-6fe53856c4f9",
+      "rule_id": "deps.known-vulnerability",
+      "title": "urllib3 1.26.9: Decompression-bomb safeguards bypassed when following HTTP redirects (streaming API)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "urllib3",
+        "ecosystem": "PyPI",
+        "version": "1.26.9"
+      },
+      "evidence": {
+        "summary": "urllib3 1.26.9 is affected by PYSEC-2026-1996, GHSA-38jv-5279-wg99. Decompression-bomb safeguards bypassed when following HTTP redirects (streaming API)",
+        "observed": "urllib3 resolves to 1.26.9 in requirements.txt",
+        "expected": "at least 2.6.3",
+        "evidence_key": "osv:PYSEC-2026-1996"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe urllib3 at version 1.26.9.",
+          "Compare against advisory PYSEC-2026-1996."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade urllib3 to 2.6.3, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-1996",
+          "https://nvd.nist.gov/vuln/detail/CVE-2026-21441",
+          "https://github.com/advisories/GHSA-38jv-5279-wg99"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-73dd5f6b30e8",
+      "rule_id": "deps.known-vulnerability",
+      "title": "urllib3 1.26.9: urllib3 streaming API improperly handles highly compressed data",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "urllib3",
+        "ecosystem": "PyPI",
+        "version": "1.26.9"
+      },
+      "evidence": {
+        "summary": "urllib3 1.26.9 is affected by PYSEC-2026-1994, GHSA-2xpw-w6gg-jr37. urllib3 streaming API improperly handles highly compressed data",
+        "observed": "urllib3 resolves to 1.26.9 in requirements.txt",
+        "expected": "at least 2.6.0",
+        "evidence_key": "osv:PYSEC-2026-1994"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe urllib3 at version 1.26.9.",
+          "Compare against advisory PYSEC-2026-1994."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade urllib3 to 2.6.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-1994",
+          "https://nvd.nist.gov/vuln/detail/CVE-2025-66471",
+          "https://github.com/advisories/GHSA-2xpw-w6gg-jr37"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-79a4c53d5ed1",
+      "rule_id": "deps.known-vulnerability",
+      "title": "werkzeug 2.0.1 has a known vulnerability (PYSEC-2026-2320)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "werkzeug",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "werkzeug 2.0.1 is affected by PYSEC-2026-2320, GHSA-29vq-49wr-vm6x. Werkzeug is a comprehensive WSGI web application library. Versions 3.1.5 and below, the safe_join function allows Windows device names as filenames if preceded by other path segments. This was previously reported as GHSA-hgf8-39gv-g3f2, but the added filtering failed to account for the fact that safe_join accepts paths with multiple segments, such as example/NUL. The function send_from_directory uses safe_join to safely serve files at user-specified paths under a directory. If the application is...",
+        "observed": "werkzeug resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 3.1.6",
+        "evidence_key": "osv:PYSEC-2026-2320"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe werkzeug at version 2.0.1.",
+          "Compare against advisory PYSEC-2026-2320."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade werkzeug to 3.1.6, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-2320",
+          "https://github.com/pallets/werkzeug/releases/tag/3.1.6",
+          "https://github.com/pallets/werkzeug/security/advisories/GHSA-29vq-49wr-vm6x"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-7a326b2342ba",
+      "rule_id": "deps.known-vulnerability",
+      "title": "requests 2.25.1: Requests vulnerable to .netrc credentials leak via malicious URLs",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "requests",
+        "ecosystem": "PyPI",
+        "version": "2.25.1"
+      },
+      "evidence": {
+        "summary": "requests 2.25.1 is affected by PYSEC-2026-1872, GHSA-9hjg-9r4m-mvj7. Requests vulnerable to .netrc credentials leak via malicious URLs",
+        "observed": "requests resolves to 2.25.1 in requirements.txt",
+        "expected": "at least 2.32.4",
+        "evidence_key": "osv:PYSEC-2026-1872"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe requests at version 2.25.1.",
+          "Compare against advisory PYSEC-2026-1872."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade requests to 2.32.4, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-1872",
+          "https://nvd.nist.gov/vuln/detail/CVE-2024-47081",
+          "https://github.com/advisories/GHSA-9hjg-9r4m-mvj7"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-86f42c3dde38",
+      "rule_id": "deps.known-vulnerability",
+      "title": "idna 2.9.0 has a known vulnerability (PYSEC-2024-60)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "idna",
+        "ecosystem": "PyPI",
+        "version": "2.9.0"
+      },
+      "evidence": {
+        "summary": "idna 2.9.0 is affected by PYSEC-2024-60, GHSA-jjg7-2v4v-x38h. A vulnerability was identified in the kjd/idna library, specifically within the `idna.encode()` function, affecting version 3.6. The issue arises from the function's handling of crafted input strings, which can lead to quadratic complexity and consequently, a denial of service condition. This vulnerability is triggered by a crafted input that causes the `idna.encode()` function to process the input with considerable computational load, significantly increasing the processing time in a quadratic ...",
+        "observed": "idna resolves to 2.9.0 in requirements.txt",
+        "expected": "at least 1d365e17e10d72d0b7876316fc7b9ca0eebdd38d",
+        "evidence_key": "osv:PYSEC-2024-60"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe idna at version 2.9.0.",
+          "Compare against advisory PYSEC-2024-60."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade idna to 1d365e17e10d72d0b7876316fc7b9ca0eebdd38d, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2024-60",
+          "https://github.com/advisories/GHSA-jjg7-2v4v-x38h"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-8fd4a8cf21a8",
+      "rule_id": "deps.known-vulnerability",
+      "title": "pyjwt 1.7.1 has a known vulnerability (PYSEC-2022-202)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "pyjwt",
+        "ecosystem": "PyPI",
+        "version": "1.7.1"
+      },
+      "evidence": {
+        "summary": "pyjwt 1.7.1 is affected by PYSEC-2022-202, GHSA-ffqj-6fqr-9h24. PyJWT is a Python implementation of RFC 7519. PyJWT supports multiple different JWT signing algorithms. With JWT, an attacker submitting the JWT token can choose the used signing algorithm. The PyJWT library requires that the application chooses what algorithms are supported. The application can specify `jwt.algorithms.get_default_algorithms()` to get support for all algorithms, or specify a single algorithm. The issue is not that big as `algorithms=jwt.algorithms.get_default_algorithms()` has t...",
+        "observed": "pyjwt resolves to 1.7.1 in requirements.txt",
+        "expected": "at least 2.4.0",
+        "evidence_key": "osv:PYSEC-2022-202"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe pyjwt at version 1.7.1.",
+          "Compare against advisory PYSEC-2022-202."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade pyjwt to 2.4.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2022-202",
+          "https://github.com/jpadilla/pyjwt/security/advisories/GHSA-ffqj-6fqr-9h24"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-94db29487bbb",
+      "rule_id": "deps.known-vulnerability",
+      "title": "urllib3 1.26.9 has a known vulnerability (PYSEC-2026-141)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "urllib3",
+        "ecosystem": "PyPI",
+        "version": "1.26.9"
+      },
+      "evidence": {
+        "summary": "urllib3 1.26.9 is affected by PYSEC-2026-141, GHSA-qccp-gfcp-xxvc. urllib3 is an HTTP client library for Python. From 1.23 to before 2.7.0, cross-origin redirects followed from the low-level API via ProxyManager.connection_from_url().urlopen(..., assert_same_host=False) still forward these sensitive headers. This vulnerability is fixed in 2.7.0.",
+        "observed": "urllib3 resolves to 1.26.9 in requirements.txt",
+        "expected": "at least 2.7.0",
+        "evidence_key": "osv:PYSEC-2026-141"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe urllib3 at version 1.26.9.",
+          "Compare against advisory PYSEC-2026-141."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade urllib3 to 2.7.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-141",
+          "https://github.com/urllib3/urllib3/security/advisories/GHSA-qccp-gfcp-xxvc"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-9af8815cd372",
+      "rule_id": "deps.known-vulnerability",
+      "title": "urllib3 1.26.9: urllib3's Proxy-Authorization request header isn't stripped during cross-origin redirects",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "urllib3",
+        "ecosystem": "PyPI",
+        "version": "1.26.9"
+      },
+      "evidence": {
+        "summary": "urllib3 1.26.9 is affected by PYSEC-2026-1995, GHSA-34jh-p97f-mpxf. urllib3's Proxy-Authorization request header isn't stripped during cross-origin redirects",
+        "observed": "urllib3 resolves to 1.26.9 in requirements.txt",
+        "expected": "at least 1.26.19",
+        "evidence_key": "osv:PYSEC-2026-1995"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe urllib3 at version 1.26.9.",
+          "Compare against advisory PYSEC-2026-1995."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade urllib3 to 1.26.19, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-1995",
+          "https://nvd.nist.gov/vuln/detail/CVE-2024-37891",
+          "https://github.com/advisories/GHSA-34jh-p97f-mpxf"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-9d797decdd9e",
+      "rule_id": "deps.known-vulnerability",
+      "title": "pyjwt 1.7.1: PyJWT: ReDoS vulnerability when calling the `is_pem_format` function.",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "pyjwt",
+        "ecosystem": "PyPI",
+        "version": "1.7.1"
+      },
+      "evidence": {
+        "summary": "pyjwt 1.7.1 is affected by PYSEC-2026-4148, GHSA-jwrc-g2q2-pq5p. PyJWT: ReDoS vulnerability when calling the `is_pem_format` function.",
+        "observed": "pyjwt resolves to 1.7.1 in requirements.txt",
+        "expected": "at least 2.14.0",
+        "evidence_key": "osv:PYSEC-2026-4148"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe pyjwt at version 1.7.1.",
+          "Compare against advisory PYSEC-2026-4148."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade pyjwt to 2.14.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-4148",
+          "https://nvd.nist.gov/vuln/detail/CVE-2026-102270",
+          "https://github.com/advisories/GHSA-jwrc-g2q2-pq5p"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-9ed05f2609d0",
+      "rule_id": "deps.known-vulnerability",
+      "title": "werkzeug 2.0.1 has a known vulnerability (PYSEC-2023-57)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "werkzeug",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "werkzeug 2.0.1 is affected by PYSEC-2023-57, GHSA-px8h-6qxv-m22q. Werkzeug is a comprehensive WSGI web application library. Browsers may allow \"nameless\" cookies that look like `=value` instead of `key=value`. A vulnerable browser may allow a compromised application on an adjacent subdomain to exploit this to set a cookie like `=__Host-test=bad` for another subdomain. Werkzeug prior to 2.2.3 will parse the cookie `=__Host-test=bad` as __Host-test=bad`. If a Werkzeug application is running next to a vulnerable or malicious subdomain which sets such a cookie usi...",
+        "observed": "werkzeug resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 2.2.3",
+        "evidence_key": "osv:PYSEC-2023-57"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe werkzeug at version 2.0.1.",
+          "Compare against advisory PYSEC-2023-57."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade werkzeug to 2.2.3, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2023-57",
+          "https://github.com/pallets/werkzeug/security/advisories/GHSA-px8h-6qxv-m22q"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-a01dcffc4d25",
+      "rule_id": "deps.known-vulnerability",
+      "title": "urllib3 1.26.9 has a known vulnerability (PYSEC-2023-212)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "urllib3",
+        "ecosystem": "PyPI",
+        "version": "1.26.9"
+      },
+      "evidence": {
+        "summary": "urllib3 1.26.9 is affected by PYSEC-2023-212, GHSA-g4mx-q9vg-27p4. urllib3 is a user-friendly HTTP client library for Python. urllib3 previously wouldn't remove the HTTP request body when an HTTP redirect response using status 301, 302, or 303 after the request had its method changed from one that could accept a request body (like `POST`) to `GET` as is required by HTTP RFCs. Although this behavior is not specified in the section for redirects, it can be inferred by piecing together information from different sections and we have observed the behavior in other ...",
+        "observed": "urllib3 resolves to 1.26.9 in requirements.txt",
+        "expected": "at least 1.26.18",
+        "evidence_key": "osv:PYSEC-2023-212"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe urllib3 at version 1.26.9.",
+          "Compare against advisory PYSEC-2023-212."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade urllib3 to 1.26.18, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2023-212",
+          "https://github.com/urllib3/urllib3/security/advisories/GHSA-g4mx-q9vg-27p4"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-a1000e0ed4c2",
+      "rule_id": "deps.known-vulnerability",
+      "title": "werkzeug 2.0.1 has a known vulnerability (PYSEC-2023-58)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "werkzeug",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "werkzeug 2.0.1 is affected by PYSEC-2023-58, GHSA-xg9f-g7g7-2323. Werkzeug is a comprehensive WSGI web application library. Prior to version 2.2.3, Werkzeug's multipart form data parser will parse an unlimited number of parts, including file parts. Parts can be a small amount of bytes, but each requires CPU time to parse and may use more memory as Python data. If a request can be made to an endpoint that accesses `request.data`, `request.form`, `request.files`, or `request.get_data(parse_form_data=False)`, it can cause unexpectedly high resource usage. This al...",
+        "observed": "werkzeug resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 2.2.3",
+        "evidence_key": "osv:PYSEC-2023-58"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe werkzeug at version 2.0.1.",
+          "Compare against advisory PYSEC-2023-58."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade werkzeug to 2.2.3, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2023-58",
+          "https://github.com/pallets/werkzeug/security/advisories/GHSA-xg9f-g7g7-2323"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-a700897f0677",
+      "rule_id": "deps.known-vulnerability",
+      "title": "werkzeug 2.0.1: Werkzeug possible resource exhaustion when parsing file data in forms",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "werkzeug",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "werkzeug 2.0.1 is affected by PYSEC-2026-3417, GHSA-q34m-jh98-gwm2. Werkzeug possible resource exhaustion when parsing file data in forms",
+        "observed": "werkzeug resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 3.0.6",
+        "evidence_key": "osv:PYSEC-2026-3417"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe werkzeug at version 2.0.1.",
+          "Compare against advisory PYSEC-2026-3417."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade werkzeug to 3.0.6, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-3417",
+          "https://nvd.nist.gov/vuln/detail/CVE-2024-49767",
+          "https://github.com/advisories/GHSA-q34m-jh98-gwm2"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-b3e7f807cf8b",
+      "rule_id": "deps.known-vulnerability",
+      "title": "flask 2.0.1 has a known vulnerability (PYSEC-2026-2151)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "flask",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "flask 2.0.1 is affected by PYSEC-2026-2151, GHSA-68rp-wp8r-4726. Flask is a web server gateway interface (WSGI) web application framework. In versions 3.1.2 and below, when the session object is accessed, Flask should set the Vary: Cookie header., resulting in a Use of Cache Containing Sensitive Information vulnerability. The logic instructs caches not to cache the response, as it may contain information specific to a logged in user. This is handled in most cases, but some forms of access such as the Python in operator were overlooked. The severity and risk d...",
+        "observed": "flask resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 3.1.3",
+        "evidence_key": "osv:PYSEC-2026-2151"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe flask at version 2.0.1.",
+          "Compare against advisory PYSEC-2026-2151."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade flask to 3.1.3, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-2151",
+          "https://github.com/pallets/flask/releases/tag/3.1.3",
+          "https://github.com/pallets/flask/security/advisories/GHSA-68rp-wp8r-4726"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-b897d6db90e6",
+      "rule_id": "deps.known-vulnerability",
+      "title": "pyjwt 1.7.1 has a known vulnerability (PYSEC-2026-177)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "pyjwt",
+        "ecosystem": "PyPI",
+        "version": "1.7.1"
+      },
+      "evidence": {
+        "summary": "pyjwt 1.7.1 is affected by PYSEC-2026-177. PyJWT is a JSON Web Token implementation in Python. Prior to 2.13.0, PyJWKClient.get_signing_key() forces a fresh HTTP request to the JWKS endpoint for every JWT with an unknown kid value, with no rate limiting. Since kid comes from the unverified token header, an attacker can trigger unlimited outbound requests. The vulnerability surfaces only when a JWKS fetch fails; an attacker can attempt to provoke that with sustained unknown-kid traffic, but the outcome depends on upstream JWKS-endpoint be...",
+        "observed": "pyjwt resolves to 1.7.1 in requirements.txt",
+        "expected": "at least 2.13.0",
+        "evidence_key": "osv:PYSEC-2026-177"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe pyjwt at version 1.7.1.",
+          "Compare against advisory PYSEC-2026-177."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade pyjwt to 2.13.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-177",
+          "https://github.com/jpadilla/pyjwt/security/advisories/GHSA-fhv5-28vv-h8m8"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-bdc3c7416830",
+      "rule_id": "deps.known-vulnerability",
+      "title": "werkzeug 2.0.1: Werkzeug safe_join() allows Windows special device names with compound extensions",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "werkzeug",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "werkzeug 2.0.1 is affected by PYSEC-2026-2044, GHSA-87hc-h4r5-73f7. Werkzeug safe_join() allows Windows special device names with compound extensions",
+        "observed": "werkzeug resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 3.1.5",
+        "evidence_key": "osv:PYSEC-2026-2044"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe werkzeug at version 2.0.1.",
+          "Compare against advisory PYSEC-2026-2044."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade werkzeug to 3.1.5, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-2044",
+          "https://nvd.nist.gov/vuln/detail/CVE-2026-21860",
+          "https://github.com/advisories/GHSA-87hc-h4r5-73f7"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-bf2318bed445",
+      "rule_id": "deps.known-vulnerability",
+      "title": "werkzeug 2.0.1: Werkzeug safe_join() allows Windows special device names",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "werkzeug",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "werkzeug 2.0.1 is affected by PYSEC-2026-2046, GHSA-hgf8-39gv-g3f2. Werkzeug safe_join() allows Windows special device names",
+        "observed": "werkzeug resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 3.1.4",
+        "evidence_key": "osv:PYSEC-2026-2046"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe werkzeug at version 2.0.1.",
+          "Compare against advisory PYSEC-2026-2046."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade werkzeug to 3.1.4, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-2046",
+          "https://nvd.nist.gov/vuln/detail/CVE-2025-66221",
+          "https://github.com/advisories/GHSA-hgf8-39gv-g3f2"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-c3483aee0e8f",
+      "rule_id": "deps.known-vulnerability",
+      "title": "werkzeug 2.0.1: Werkzeug safe_join not safe on Windows",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "werkzeug",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "werkzeug 2.0.1 is affected by PYSEC-2026-2045, GHSA-f9vj-2wh5-fj8j. Werkzeug safe_join not safe on Windows",
+        "observed": "werkzeug resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 3.0.6",
+        "evidence_key": "osv:PYSEC-2026-2045"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe werkzeug at version 2.0.1.",
+          "Compare against advisory PYSEC-2026-2045."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade werkzeug to 3.0.6, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-2045",
+          "https://nvd.nist.gov/vuln/detail/CVE-2024-49766",
+          "https://github.com/advisories/GHSA-f9vj-2wh5-fj8j"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-c41f5048198b",
+      "rule_id": "deps.known-vulnerability",
+      "title": "pyjwt 1.7.1: PyJWT: PyJWKClient still amplifies unauthenticated JWKS fetches on unknown kid values (incomplete fix of CVE-2026-48524)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "pyjwt",
+        "ecosystem": "PyPI",
+        "version": "1.7.1"
+      },
+      "evidence": {
+        "summary": "pyjwt 1.7.1 is affected by PYSEC-2026-4140, GHSA-2gx3-rcp4-g85q. PyJWT: PyJWKClient still amplifies unauthenticated JWKS fetches on unknown kid values (incomplete fix of CVE-2026-48524)",
+        "observed": "pyjwt resolves to 1.7.1 in requirements.txt",
+        "expected": "at least 2.14.0",
+        "evidence_key": "osv:PYSEC-2026-4140"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe pyjwt at version 1.7.1.",
+          "Compare against advisory PYSEC-2026-4140."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade pyjwt to 2.14.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-4140",
+          "https://nvd.nist.gov/vuln/detail/CVE-2026-101917",
+          "https://github.com/advisories/GHSA-2gx3-rcp4-g85q"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-c4dd4ddc376c",
+      "rule_id": "deps.known-vulnerability",
+      "title": "requests 2.25.1: Requests `Session` object does not verify requests after making first request with verify=False",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "requests",
+        "ecosystem": "PyPI",
+        "version": "2.25.1"
+      },
+      "evidence": {
+        "summary": "requests 2.25.1 is affected by PYSEC-2026-1873, GHSA-9wx4-h78v-vm56. Requests `Session` object does not verify requests after making first request with verify=False",
+        "observed": "requests resolves to 2.25.1 in requirements.txt",
+        "expected": "at least 2.32.0",
+        "evidence_key": "osv:PYSEC-2026-1873"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe requests at version 2.25.1.",
+          "Compare against advisory PYSEC-2026-1873."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade requests to 2.32.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-1873",
+          "https://nvd.nist.gov/vuln/detail/CVE-2024-35195",
+          "https://github.com/advisories/GHSA-9wx4-h78v-vm56"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-d7aa6d499f5b",
+      "rule_id": "deps.known-vulnerability",
+      "title": "pyjwt 1.7.1 has a known vulnerability (PYSEC-2026-175)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "pyjwt",
+        "ecosystem": "PyPI",
+        "version": "1.7.1"
+      },
+      "evidence": {
+        "summary": "pyjwt 1.7.1 is affected by PYSEC-2026-175. PyJWT is a JSON Web Token implementation in Python. Prior to 2.13.0, PyJWKClient passes its uri argument directly to urllib.request.urlopen() which uses Python stdlib's default OpenerDirector registering HTTPHandler, HTTPSHandler, FTPHandler, FileHandler, and DataHandler. There is currently no documented option to restrict which schemes PyJWKClient will fetch. If an application's jku URL ingestion path accepts attacker-influenced URLs (e.g., from JWT header, configuration file, OAuth flow parame...",
+        "observed": "pyjwt resolves to 1.7.1 in requirements.txt",
+        "expected": "at least 2.13.0",
+        "evidence_key": "osv:PYSEC-2026-175"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe pyjwt at version 1.7.1.",
+          "Compare against advisory PYSEC-2026-175."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade pyjwt to 2.13.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-175"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-e119345ded65",
+      "rule_id": "deps.known-vulnerability",
+      "title": "werkzeug 2.0.1 has a known vulnerability (PYSEC-2022-203)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "werkzeug",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "werkzeug 2.0.1 is affected by PYSEC-2022-203. ** DISPUTED ** Improper parsing of HTTP requests in Pallets Werkzeug v2.1.0 and below allows attackers to perform HTTP Request Smuggling using a crafted HTTP request with multiple requests included inside the body. NOTE: the vendor's position is that this behavior can only occur in unsupported configurations involving development mode and an HTTP server from outside the Werkzeug project.",
+        "observed": "werkzeug resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 2.1.1",
+        "evidence_key": "osv:PYSEC-2022-203"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe werkzeug at version 2.0.1.",
+          "Compare against advisory PYSEC-2022-203."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade werkzeug to 2.1.1, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2022-203"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-e335f524aa7c",
+      "rule_id": "deps.known-vulnerability",
+      "title": "werkzeug 2.0.1: Werkzeug debugger vulnerable to remote execution when interacting with attacker controlled domain",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "werkzeug",
+        "ecosystem": "PyPI",
+        "version": "2.0.1"
+      },
+      "evidence": {
+        "summary": "werkzeug 2.0.1 is affected by PYSEC-2026-2043, GHSA-2g68-c3qc-8985. Werkzeug debugger vulnerable to remote execution when interacting with attacker controlled domain",
+        "observed": "werkzeug resolves to 2.0.1 in requirements.txt",
+        "expected": "at least 3.0.3",
+        "evidence_key": "osv:PYSEC-2026-2043"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe werkzeug at version 2.0.1.",
+          "Compare against advisory PYSEC-2026-2043."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade werkzeug to 3.0.3, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-2043",
+          "https://nvd.nist.gov/vuln/detail/CVE-2024-34069",
+          "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-e7fdd9446e25",
+      "rule_id": "deps.known-vulnerability",
+      "title": "requests 2.25.1 has a known vulnerability (PYSEC-2023-74)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "requests",
+        "ecosystem": "PyPI",
+        "version": "2.25.1"
+      },
+      "evidence": {
+        "summary": "requests 2.25.1 is affected by PYSEC-2023-74, GHSA-j8r2-6x86-q33q. Requests is a HTTP library. Since Requests 2.3.0, Requests has been leaking Proxy-Authorization headers to destination servers when redirected to an HTTPS endpoint. This is a product of how we use `rebuild_proxies` to reattach the `Proxy-Authorization` header to requests. For HTTP connections sent through the tunnel, the proxy will identify the header in the request itself and remove it prior to forwarding to the destination server. However when sent over HTTPS, the `Proxy-Authorization` header ...",
+        "observed": "requests resolves to 2.25.1 in requirements.txt",
+        "expected": "at least 2.31.0",
+        "evidence_key": "osv:PYSEC-2023-74"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe requests at version 2.25.1.",
+          "Compare against advisory PYSEC-2023-74."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade requests to 2.31.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2023-74",
+          "https://github.com/psf/requests/security/advisories/GHSA-j8r2-6x86-q33q"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-eb9d8bd03872",
+      "rule_id": "deps.known-vulnerability",
+      "title": "urllib3 1.26.9: urllib3 allows an unbounded number of links in the decompression chain",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "urllib3",
+        "ecosystem": "PyPI",
+        "version": "1.26.9"
+      },
+      "evidence": {
+        "summary": "urllib3 1.26.9 is affected by PYSEC-2026-1998, GHSA-gm62-xv2j-4w53. urllib3 allows an unbounded number of links in the decompression chain",
+        "observed": "urllib3 resolves to 1.26.9 in requirements.txt",
+        "expected": "at least 2.6.0",
+        "evidence_key": "osv:PYSEC-2026-1998"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe urllib3 at version 1.26.9.",
+          "Compare against advisory PYSEC-2026-1998."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade urllib3 to 2.6.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-1998",
+          "https://nvd.nist.gov/vuln/detail/CVE-2025-66418",
+          "https://github.com/advisories/GHSA-gm62-xv2j-4w53"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-effac12b715e",
+      "rule_id": "deps.known-vulnerability",
+      "title": "idna 2.9.0 has a known vulnerability (PYSEC-2026-215)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "idna",
+        "ecosystem": "PyPI",
+        "version": "2.9.0"
+      },
+      "evidence": {
+        "summary": "idna 2.9.0 is affected by PYSEC-2026-215, GHSA-65pc-fj4g-8rjx. Internationalized Domain Names in Applications (IDNA) for Python provides support for Internationalized Domain Names in Applications (IDNA) and Unicode IDNA Compatibility Processing. In versions prior to 3.15, payloads such as `\"\\u0660\" * N` or `\"\\u30fb\" * N + \"\\u6f22\"` utilize the `valid_contexto` function prior to length rejection, and for high values of `N` will take a long time to process. This is the same issue as CVE-2024-3651, however the original remediation in 2024 was not a complete fi...",
+        "observed": "idna resolves to 2.9.0 in requirements.txt",
+        "expected": "at least 3.15",
+        "evidence_key": "osv:PYSEC-2026-215"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe idna at version 2.9.0.",
+          "Compare against advisory PYSEC-2026-215."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade idna to 3.15, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-215",
+          "https://github.com/kjd/idna/security/advisories/GHSA-65pc-fj4g-8rjx"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "vk-f3dd95e3bf9f",
+      "rule_id": "deps.known-vulnerability",
+      "title": "pyjwt 1.7.1 has a known vulnerability (PYSEC-2026-120)",
+      "category": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "severity": "medium",
+      "confidence": "likely",
+      "source": "deps",
+      "location": {
+        "type": "dependency",
+        "file": "requirements.txt",
+        "package": "pyjwt",
+        "ecosystem": "PyPI",
+        "version": "1.7.1"
+      },
+      "evidence": {
+        "summary": "pyjwt 1.7.1 is affected by PYSEC-2026-120, GHSA-752w-5fwx-jx9f. PyJWT is a JSON Web Token implementation in Python. Prior to 2.12.0, PyJWT does not validate the crit (Critical) Header Parameter defined in RFC 7515 \u00a74.1.11. When a JWS token contains a crit array listing extensions that PyJWT does not understand, the library accepts the token instead of rejecting it. This violates the MUST requirement in the RFC. This vulnerability is fixed in 2.12.0.",
+        "observed": "pyjwt resolves to 1.7.1 in requirements.txt",
+        "expected": "at least 2.12.0",
+        "evidence_key": "osv:PYSEC-2026-120"
+      },
+      "reproduction": {
+        "kind": "static",
+        "steps": [
+          "Resolve dependencies from requirements.txt.",
+          "Observe pyjwt at version 1.7.1.",
+          "Compare against advisory PYSEC-2026-120."
+        ]
+      },
+      "remediation": {
+        "guidance": "Upgrade pyjwt to 2.12.0, then re-resolve the lockfile.",
+        "root_cause_hint": "A dependency is pinned to a version with a published advisory.",
+        "references": [
+          "https://osv.dev/vulnerability/PYSEC-2026-120"
+        ],
+        "fixable_by_giver": true
+      },
+      "status": "open",
+      "rank": 1.3,
+      "first_seen_run": "20261117-231333-382284",
+      "last_seen_run": "20261117-231333-382284"
+    }
+  ],
+  "skipped": [
+    {
+      "check_id": "authz.unprotected-endpoint",
+      "layer": "endpoint",
+      "reason": "this run was static-only, so the endpoint layer did not run; --static-only makes no outbound connection by design"
+    },
+    {
+      "check_id": "exposure.shared-trust-domain",
+      "layer": "exposure",
+      "reason": "this run was static-only, so the exposure layer did not run; --static-only makes no outbound connection by design"
+    },
+    {
+      "check_id": "idor.sequential-id-access",
+      "layer": "endpoint",
+      "reason": "this run was static-only, so the endpoint layer did not run; --static-only makes no outbound connection by design"
+    },
+    {
+      "check_id": "injection.sql-differential",
+      "layer": "endpoint",
+      "reason": "this run was static-only, so the endpoint layer did not run; --static-only makes no outbound connection by design"
+    },
+    {
+      "check_id": "misconfig.cors-reflection",
+      "layer": "endpoint",
+      "reason": "this run was static-only, so the endpoint layer did not run; --static-only makes no outbound connection by design"
+    },
+    {
+      "check_id": "misconfig.missing-security-headers",
+      "layer": "endpoint",
+      "reason": "this run was static-only, so the endpoint layer did not run; --static-only makes no outbound connection by design"
+    },
+    {
+      "check_id": "misconfig.verbose-error",
+      "layer": "endpoint",
+      "reason": "this run was static-only, so the endpoint layer did not run; --static-only makes no outbound connection by design"
+    },
+    {
+      "check_id": "runtime.auth-check-not-fired",
+      "layer": "runtime",
+      "reason": "this run was static-only, so the runtime layer did not run; --static-only makes no outbound connection by design"
+    },
+    {
+      "check_id": "runtime.query-missing-owner-filter",
+      "layer": "runtime",
+      "reason": "this run was static-only, so the runtime layer did not run; --static-only makes no outbound connection by design"
+    },
+    {
+      "check_id": "ssrf.internal-canary-fetch",
+      "layer": "endpoint",
+      "reason": "this run was static-only, so the endpoint layer did not run; --static-only makes no outbound connection by design"
+    },
+    {
+      "check_id": "traversal.path-escape",
+      "layer": "endpoint",
+      "reason": "this run was static-only, so the endpoint layer did not run; --static-only makes no outbound connection by design"
+    }
+  ]
+}
