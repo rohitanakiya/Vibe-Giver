@@ -86,9 +86,9 @@ jobs:
     #
     # It is the third time in this project that an engine which ran, exited 0
     # and learned nothing has been indistinguishable from a clean result.
-    env:
-      WORK: ${{ runner.temp }}/work
-
+    # WORK is derived per step from $RUNNER_TEMP rather than set in a job-level
+    # env block: the `runner` context is not available there, and GitHub
+    # rejects the entire workflow file if it is used.
     steps:
       - uses: actions/checkout@v4
 
@@ -136,6 +136,7 @@ jobs:
       - name: stage the fixture outside the workspace
         run: |
           set -euo pipefail
+          WORK="$RUNNER_TEMP/work"
           rm -rf "$WORK"
           mkdir -p "$WORK"
           cp -r .killer/fixtures/flask-vulnerable "$WORK/app"
@@ -160,6 +161,7 @@ jobs:
       - name: case A, no scanners visible - zero findings is not clean
         run: |
           set -euo pipefail
+          WORK="$RUNNER_TEMP/work"
           cd "$WORK"
           export PATH="/usr/local/bin:/usr/bin:/bin:$(go env GOPATH)/bin"
           if command -v semgrep >/dev/null; then
@@ -205,6 +207,7 @@ jobs:
       - name: case B, the static engine present - findings appear
         run: |
           set -euo pipefail
+          WORK="$RUNNER_TEMP/work"
           cd "$WORK"
           set +e
           vibekiller scan --repo app --static-only --runs-dir runs --quiet
@@ -239,6 +242,7 @@ jobs:
       - name: the envelope a live Killer writes is the one this build expects
         run: |
           set -euo pipefail
+          WORK="$RUNNER_TEMP/work"
           run_dir="$WORK/runs/$(ls "$WORK/runs" | head -1)"
           live="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['schema_version'])" "$run_dir/findings.json")"
           expected="$(./bin/vibegiver contract | awk '/^Envelope schema_version/ {print $3}')"
@@ -255,6 +259,7 @@ jobs:
       - name: case C, the v0 loop fixes the misconfiguration findings
         run: |
           set -euo pipefail
+          WORK="$RUNNER_TEMP/work"
 
           # A fixture repository owned by somebody who is not Vibe Giver, so
           # the commit identity and the clean-tree rule are exercised for real.
@@ -334,6 +339,7 @@ jobs:
       - name: case C, a separate Killer scan confirms each fix
         run: |
           set -euo pipefail
+          WORK="$RUNNER_TEMP/work"
           branches="$(git -C "$WORK/fixrepo" branch --list 'vibegiver/*' --format='%(refname:short)')"
           if [ -z "$branches" ]; then
             echo "::error::no vibegiver branches to verify." >&2
@@ -367,6 +373,7 @@ jobs:
       - name: a newer envelope is refused, not read
         run: |
           set -euo pipefail
+          WORK="$RUNNER_TEMP/work"
           run_dir="$WORK/runs/$(ls "$WORK/runs" | head -1)"
           mkdir -p "$WORK/forged"
           python3 - "$run_dir/findings.json" "$WORK/forged/findings.json" <<'PY'
