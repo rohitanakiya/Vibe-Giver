@@ -256,13 +256,17 @@ sensitive to the engine, so a floating version turns an upstream change into a
 red build. **Giver proves a static fix by reading that silence, so a pack gone
 quiet does not fail here — it succeeds.**
 
-Measured in this repository's own CI, before the pin: a pipx-installed latest
-Semgrep reported `engine.semgrep` as having run and produced **0 findings** on
-`flask-vulnerable`, where 1.185.0 produces 11. Follow that through the loop and
-gate 0 finds the weakness already absent, so every static finding comes back
-`already_resolved` — nothing to fix — for a deliberately vulnerable
-application. A false clean, reached honestly from a silent engine, in the one
-direction nobody re-reads.
+Follow that through the loop and gate 0 would find the weakness already absent,
+so every static finding would come back `already_resolved` — nothing to fix —
+for a deliberately vulnerable application. A false clean, in the one direction
+nobody re-reads.
+
+**This is Killer's stated reasoning, not a measurement taken here.** A CI run
+on a floating Semgrep was briefly believed to demonstrate it, and did not: that
+run's zero findings had a different cause (see the section below), and the
+engine version was never shown to matter in this repository. The pin and the
+guard are prudent, not evidenced. If you want them evidenced, put two Semgrep
+versions on one runner and measure it — until then, do not cite that run.
 
 `killer.GuardStaticAbsence` is the guard: when the installed Semgrep is not the
 pinned one, a static finding's *absence* becomes inconclusive instead of gone,
@@ -274,19 +278,43 @@ would have told us is not working, absence is not evidence.
 When bumping to a newer Killer, bump the stamp, the CI pin and
 `GuardStaticAbsence`'s expectation together, and re-run the round trip.
 
-## An engine that ran and learned nothing
+## An engine that ran and learned nothing: it was .gitignore
 
-`engine.osv-scanner` consults a remote advisory service. On two CI runs of the
-same fixture at the same commit it reported **42 findings and then 0**, and
-Killer correctly recorded it as having run both times, because it exited 0.
+Three red builds in a row were diagnosed wrongly twice before this was
+measured, so it is written out in full.
 
-Nothing in that output distinguishes "ran, and these dependencies are fine"
-from "ran, and learned nothing". It is this project's own bug shape arriving
-from outside it, and it is why CI's round trip depends on Semgrep instead:
-Killer ships the rule pack embedded, so it needs no network and gives the same
-answer every time.
+**Semgrep and osv-scanner both skip paths that their enclosing git repository
+ignores.** The CI round trip staged its fixture under `.work/`, and `/.work/`
+was added to this repository's `.gitignore` in the v0 commit. From that commit
+onward both engines scanned **zero files**, exited **0**, and reported **no
+findings** — and Killer correctly recorded them as having run, because they
+had. A deliberately vulnerable application came back clean.
 
-The general rule for anything asserted in CI here: prefer the engine whose
-answer is determined by the inputs. If a network-dependent engine has to be
-used, assert the shape you expect from it first, so a quiet failure is a red
-build rather than a green one.
+Measured directly, which is what finally settled it:
+
+```
+semgrep ... .work/app      -> results: 0   paths scanned: 0   errors: 0
+semgrep ... <same file outside the repo> -> results: 3   paths scanned: 1
+osv-scanner ... .work/app  -> 0 Extract calls / No package sources found
+```
+
+The timeline confirms it: the one green round trip was the last commit before
+`/.work/` entered `.gitignore`, and every run after it failed.
+
+**Two wrong diagnoses were committed before this.** The first blamed
+osv-scanner's remote advisory service for a 42-then-0 result; the second
+blamed the Semgrep version. Both were plausible correlations, neither was
+measured, and both were wrong. The lesson is the one this repository already
+states and is easy to skip when a build is red: a cause you have not run
+something to establish is a guess, however well it fits.
+
+Giver itself is **not** exposed to this, and that was measured rather than
+assumed. Its worktrees are real git worktrees, so even under a parent that
+ignores `runs/`, git resolves the worktree as its own repository root and
+semgrep scans it normally — 3 findings, 1 path scanned, from a worktree at
+`runs/giver/worktrees/<id>` in a repo whose `.gitignore` contains `/runs/`.
+
+What to take from it: when something that runs an external engine reports
+nothing, check that it looked at any files at all before believing it. A
+directory that an enclosing repository ignores is the cheapest way to make
+every scanner in this toolchain honestly agree that an application is clean.

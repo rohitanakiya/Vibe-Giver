@@ -69,6 +69,26 @@ jobs:
   round-trip:
     name: round trip against a live Killer
     runs-on: ubuntu-latest
+
+    # Everything this job stages lives OUTSIDE the workspace, deliberately,
+    # and finding out why cost three red builds.
+    #
+    # Semgrep and osv-scanner both skip paths that their enclosing git
+    # repository ignores. This job used to stage the fixture under .work/,
+    # which this repository gitignores, so both engines scanned zero files,
+    # exited 0, and reported no findings -- which Killer correctly recorded as
+    # "the check ran". A deliberately vulnerable application came back clean.
+    #
+    # Measured directly rather than inferred: semgrep reports
+    # "paths scanned: 0" with no errors on a gitignored directory, and 3
+    # findings on the same file outside one. osv-scanner reports "0 Extract
+    # calls / No package sources found" on the same directory.
+    #
+    # It is the third time in this project that an engine which ran, exited 0
+    # and learned nothing has been indistinguishable from a clean result.
+    env:
+      WORK: ${{ runner.temp }}/work
+
     steps:
       - uses: actions/checkout@v4
 
@@ -77,18 +97,27 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      # The committed corpus was produced by this exact binary, and a corpus
-      # is a photograph: it cannot notice that the producer changed. So the
-      # pinned Killer is installed and run here, and the document it writes
-      # today is fed through the same loader.
-      #
-      # This is the job that would have caught the stale envelope version on
-      # its own, with no document to compare against: the brief and the
-      # roadmap both said 1.1, and a real run says 1.2.
-      - name: install the pinned Vibe Killer
+      # Pinned to the Semgrep that Killer v1.0.0 pins in its own CI. Killer
+      # pins it because the silent half of its rule-pack assertion is
+      # sensitive to the engine and not only to the rules, so a floating
+      # version turns an upstream change into a red build on a commit that
+      # touched nothing. Giver reads that silence as proof a fix landed, so
+      # the same drift here is a false clean rather than a red build --
+      # `vibegiver fix` refuses a static absence on a mismatched engine for
+      # that reason, and this pin keeps the job testing the fixes rather than
+      # testing the guard.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: install the pinned Vibe Killer and Semgrep
         run: |
           go install github.com/rohitanakiya/Vibe-Killer/cmd/vibekiller@v1.0.0
+          pip install --disable-pip-version-check semgrep==1.185.0
+          # Verified rather than assumed: a silent install failure would make
+          # every scan below find nothing and look like a pass.
           vibekiller --version
+          semgrep --version
 
       - name: check out Killer's fixtures
         uses: actions/checkout@v4
@@ -100,42 +129,50 @@ jobs:
       # Built, not `go run`. `go run` reports its own exit 1 for any non-zero
       # exit of the program it runs -- it prints "exit status 3" and exits 1 --
       # so every assertion on an exact exit code below would be checking go
-      # run's code instead of Giver's. That is how the refusal assertion first
-      # failed here while the refusal itself was working perfectly, and a
-      # `|| [ $? -eq 1 ]` through go run would have passed on exit 3 too.
+      # run's code instead of Giver's.
       - name: build the binary the assertions run
         run: go build -o bin/vibegiver ./cmd/vibegiver
 
-      - name: stage the fixture
+      - name: stage the fixture outside the workspace
         run: |
           set -euo pipefail
-          mkdir -p .work
-          cp -r .killer/fixtures/flask-vulnerable .work/app
-          (cd .work/app && vibekiller init)
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+          cp -r .killer/fixtures/flask-vulnerable "$WORK/app"
+          (cd "$WORK/app" && vibekiller init)
+          # The staging directory must not be inside a git repository that
+          # ignores it, which is the whole point of using runner.temp.
+          if git -C "$WORK" rev-parse --show-toplevel 2>/dev/null; then
+            echo "::error::$WORK is inside a git repository; the engines may skip it." >&2
+            exit 1
+          fi
+          echo "staged at $WORK/app, outside any git repository"
 
-      # Case A: the runner is bare, so no scanner is installed. This is not a
-      # contrived case -- it is what the first run of this job produced, and
-      # it is the most dangerous output in the whole system.
+      # Case A: no scanners visible to Killer. This is not contrived -- it is
+      # what a bare runner produces, and it is the most dangerous output in
+      # the system: Killer scans a deliberately vulnerable application,
+      # reports "No findings from the checks that ran", lists every check as
+      # skipped, and exits 0. Its success code.
       #
-      # Killer scans a deliberately vulnerable Flask application, reports "No
-      # findings from the checks that ran", lists all fourteen checks as
-      # skipped, and exits 0. Its success code. Every signal a pipeline
-      # usually gates on says clean.
-      #
-      # So this asserts that Giver refuses that conclusion: exit 1, and the
-      # coverage warning present in the output. Killer's own exit 0 is
-      # asserted too, because if a later Killer changes it this job should say
-      # so rather than quietly start testing something else.
-      - name: case A, no scanners installed - zero findings is not clean
+      # Semgrep is installed by now, so it is hidden rather than uninstalled:
+      # PATH without the Python bin directory is the honest way to produce the
+      # bare-runner shape without reordering the job around it.
+      - name: case A, no scanners visible - zero findings is not clean
         run: |
           set -euo pipefail
-          cd .work
+          cd "$WORK"
+          export PATH="/usr/local/bin:/usr/bin:/bin:$(go env GOPATH)/bin"
+          if command -v semgrep >/dev/null; then
+            echo "::error::semgrep is still on PATH; this step would not be testing the bare-runner shape." >&2
+            exit 1
+          fi
+
           set +e
           vibekiller scan --repo app --static-only --runs-dir runs-bare --quiet
           scan_code=$?
           set -e
           if [ "$scan_code" -ne 0 ]; then
-            echo "::notice::Killer exited $scan_code on a bare runner (was 0 when this was written)."
+            echo "::notice::Killer exited $scan_code with no scanners (was 0 when this was written)."
           fi
 
           run_dir="runs-bare/$(ls runs-bare | head -1)"
@@ -147,9 +184,9 @@ jobs:
             exit 1
           fi
 
-          cd ..
+          cd "$GITHUB_WORKSPACE"
           set +e
-          out="$(./bin/vibegiver inspect ".work/$run_dir" 2>&1)"
+          out="$(./bin/vibegiver inspect "$WORK/$run_dir" 2>&1)"
           code=$?
           set -e
           echo "$out"
@@ -162,61 +199,19 @@ jobs:
             exit 1
           fi
 
-      # Semgrep, not osv-scanner, and the reason is worth recording.
-      #
-      # This step first used osv-scanner, because it is a Go install and takes
-      # seconds where Semgrep's does not. It found 42 findings on the first
-      # run and 0 on the second, from the same fixture and the same commit:
-      # it consults a remote advisory service, so it is network-dependent, and
-      # Killer correctly recorded it as having run both times. Nothing in that
-      # output distinguishes "ran and the dependencies are fine" from "ran and
-      # learned nothing", which is this project's own bug shape arriving from
-      # the outside.
-      #
-      # Semgrep ships its rule pack embedded in the Killer binary and needs no
-      # network, so it gives the same answer every time. It is also the engine
-      # the v0 strategies actually depend on: both misconfiguration findings
-      # they fix are sast.
-      # Pinned to the version Killer v1.0.0 pins in its own CI, and pinned for
-      # a stronger reason here than there.
-      #
-      # Killer pins it because the silent half of its rule-pack assertion is
-      # sensitive to the engine, so a floating version turns an upstream change
-      # into a red build on a commit that touched nothing. Giver inherits that
-      # and makes it worse: it proves a static fix by reading that silence, so
-      # a pack gone quiet does not fail here, it succeeds. Measured on this
-      # workflow before the pin: a pipx-installed latest Semgrep reported
-      # engine.semgrep as having run and produced 0 findings on
-      # flask-vulnerable, where 1.185.0 produces 11. Followed through the loop
-      # that is already_resolved -- nothing to fix -- for a deliberately
-      # vulnerable application.
-      #
-      # `vibegiver fix` now refuses to read a static absence as a fix when the
-      # installed Semgrep is not the pinned one, so a future drift is a
-      # blocked_unverifiable rather than a false clean. The pin keeps this job
-      # testing the fixes rather than testing that guard.
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: install semgrep
-        run: |
-          pip install --disable-pip-version-check semgrep==1.185.0
-          # Verified rather than assumed: a silent install failure would make
-          # the next steps scan with no static engine, find nothing to fix,
-          # and look like a pass.
-          semgrep --version
-
-      - name: case B, a scanner present - findings appear and are attemptable
+      # Case B: with the static engine present, the same fixture yields real
+      # findings. Both misconfiguration findings v0 fixes are sast, so this is
+      # the engine the next step depends on.
+      - name: case B, the static engine present - findings appear
         run: |
           set -euo pipefail
-          cd .work
+          cd "$WORK"
           set +e
           vibekiller scan --repo app --static-only --runs-dir runs --quiet
           scan_code=$?
           set -e
           if [ "$scan_code" -ne 1 ]; then
-            echo "::error::Killer exited $scan_code scanning a vulnerable fixture with a scanner installed, want 1 (findings at or above the threshold)." >&2
+            echo "::error::Killer exited $scan_code scanning a vulnerable fixture with Semgrep installed, want 1 (findings at or above the threshold)." >&2
             exit 1
           fi
 
@@ -224,16 +219,16 @@ jobs:
           found="$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1]))['findings']))" "$run_dir/findings.json")"
           echo "with semgrep: $found finding(s)"
           if [ "$found" -eq 0 ]; then
-            echo "::error::No findings with a scanner installed; this step asserts nothing." >&2
+            echo "::error::No findings with Semgrep installed; this step asserts nothing." >&2
             exit 1
           fi
 
-          cd ..
+          cd "$GITHUB_WORKSPACE"
           # Exactly 1. Exit 3 would mean the contract was refused, which is
           # the failure this job exists to catch, and a loose check reads it
           # as success.
           set +e
-          ./bin/vibegiver inspect ".work/$run_dir"
+          ./bin/vibegiver inspect "$WORK/$run_dir"
           code=$?
           set -e
           if [ "$code" -ne 1 ]; then
@@ -244,7 +239,7 @@ jobs:
       - name: the envelope a live Killer writes is the one this build expects
         run: |
           set -euo pipefail
-          run_dir=".work/runs/$(ls .work/runs | head -1)"
+          run_dir="$WORK/runs/$(ls "$WORK/runs" | head -1)"
           live="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['schema_version'])" "$run_dir/findings.json")"
           expected="$(./bin/vibegiver contract | awk '/^Envelope schema_version/ {print $3}')"
           echo "live Killer wrote: $live"
@@ -254,34 +249,29 @@ jobs:
             exit 1
           fi
 
-      # The v0 loop, end to end, against the fixture Killer ships. This is the
-      # round trip the brief calls the demo and the test: Killer finds it,
-      # Giver fixes it, and a Killer scan that Giver did not run confirms it.
-      #
-      # It needs the Semgrep installed above: both misconfiguration findings
-      # v0 fixes are sast, so without that engine there is nothing to fix and
-      # this step would assert nothing. It checks they are there before
-      # trying.
+      # The v0 loop, end to end. This is the round trip the brief calls the
+      # demo and the test: Killer finds it, Giver fixes it, and a Killer scan
+      # that Giver did not run confirms it.
       - name: case C, the v0 loop fixes the misconfiguration findings
         run: |
           set -euo pipefail
 
-          # A fixture repository with an owner who is not Vibe Giver, so the
-          # commit identity and the clean-tree rule are exercised for real.
-          rm -rf .work/fixrepo
-          mkdir -p .work/fixrepo
-          cp .killer/fixtures/flask-vulnerable/app.py .killer/fixtures/flask-vulnerable/requirements.txt .work/fixrepo/
-          cd .work/fixrepo
-          git init -q
-          git config user.name "Fixture Owner"
-          git config user.email owner@example.invalid
-          git add -A
-          git commit -qm "the flask-vulnerable fixture"
-          head_before="$(git rev-parse HEAD)"
-          cd ../..
+          # A fixture repository owned by somebody who is not Vibe Giver, so
+          # the commit identity and the clean-tree rule are exercised for real.
+          rm -rf "$WORK/fixrepo"
+          mkdir -p "$WORK/fixrepo"
+          cp .killer/fixtures/flask-vulnerable/app.py \
+             .killer/fixtures/flask-vulnerable/requirements.txt "$WORK/fixrepo/"
+          git -C "$WORK/fixrepo" init -q
+          git -C "$WORK/fixrepo" config user.name "Fixture Owner"
+          git -C "$WORK/fixrepo" config user.email owner@example.invalid
+          git -C "$WORK/fixrepo" add -A
+          git -C "$WORK/fixrepo" commit -qm "the flask-vulnerable fixture"
+          head_before="$(git -C "$WORK/fixrepo" rev-parse HEAD)"
 
-          vibekiller scan --repo .work/fixrepo --static-only --runs-dir .work/fixruns --quiet || [ $? -eq 1 ]
-          run_dir=".work/fixruns/$(ls .work/fixruns | head -1)"
+          vibekiller scan --repo "$WORK/fixrepo" --static-only \
+            --runs-dir "$WORK/fixruns" --quiet || [ $? -eq 1 ]
+          run_dir="$WORK/fixruns/$(ls "$WORK/fixruns" | head -1)"
 
           misconfig="$(python3 -c "
           import json,sys
@@ -294,10 +284,10 @@ jobs:
             exit 1
           fi
 
-          # Exit 1 is expected: the source scan skipped checks, so nothing here
-          # is a clean bill of health even once the fixes land.
+          # Exit 1 is expected: the source scan skipped checks, so nothing
+          # here is a clean bill of health even once the fixes land.
           set +e
-          ./bin/vibegiver fix "$run_dir" --repo .work/fixrepo --runs-dir .work/giverruns
+          ./bin/vibegiver fix "$run_dir" --repo "$WORK/fixrepo" --runs-dir "$WORK/giverruns"
           code=$?
           set -e
           if [ "$code" -ne 1 ]; then
@@ -309,51 +299,52 @@ jobs:
           import json,sys
           d=json.load(open(sys.argv[1]))
           print(len([o for o in d['outcomes'] if o['status']=='fixed']))
-          " .work/giverruns/fix_report.json)"
+          " "$WORK/giverruns/fix_report.json")"
           echo "fixed: $fixed"
           if [ "$fixed" -lt 2 ]; then
             echo "::error::Giver proved $fixed fixes, want at least 2." >&2
             exit 1
           fi
 
-          # The operator checkout must be untouched: same HEAD, clean tree.
-          cd .work/fixrepo
-          if [ "$(git rev-parse HEAD)" != "$head_before" ]; then
+          # The operator checkout must be untouched: same HEAD, clean tree, no
+          # stray worktree.
+          if [ "$(git -C "$WORK/fixrepo" rev-parse HEAD)" != "$head_before" ]; then
             echo "::error::Giver moved the operator HEAD." >&2
             exit 1
           fi
-          if [ -n "$(git status --porcelain)" ]; then
+          if [ -n "$(git -C "$WORK/fixrepo" status --porcelain)" ]; then
             echo "::error::Giver left the operator working tree dirty." >&2
             exit 1
           fi
-          if [ "$(git worktree list | wc -l)" -ne 1 ]; then
+          if [ "$(git -C "$WORK/fixrepo" worktree list | wc -l)" -ne 1 ]; then
             echo "::error::Giver left a worktree behind." >&2
-            git worktree list >&2
+            git -C "$WORK/fixrepo" worktree list >&2
             exit 1
           fi
           # No tool trailers in anything Giver wrote into someone else's repo.
-          if git log --all --format='%B' | grep -qiE "co-authored-by|generated with \[claude"; then
+          if git -C "$WORK/fixrepo" log --all --format='%B' | grep -qiE "co-authored-by|generated with \[claude"; then
             echo "::error::Giver wrote an attribution trailer into a commit message." >&2
             exit 1
           fi
-          git branch --list 'vibegiver/*'
-          cd ../..
+          git -C "$WORK/fixrepo" branch --list 'vibegiver/*'
 
       # The independent confirmation. Giver verified these fixes with its own
       # focused re-scans; this scans each branch separately and asks Killer
-      # again, because a tool checking its own work is the thing this project
-      # does not accept as evidence.
+      # again, because a tool checking its own work is not evidence.
       - name: case C, a separate Killer scan confirms each fix
         run: |
           set -euo pipefail
-          root="$PWD"
-          branches="$(git -C .work/fixrepo branch --list 'vibegiver/*' --format='%(refname:short)')"
+          branches="$(git -C "$WORK/fixrepo" branch --list 'vibegiver/*' --format='%(refname:short)')"
+          if [ -z "$branches" ]; then
+            echo "::error::no vibegiver branches to verify." >&2
+            exit 1
+          fi
           for branch in $branches; do
             id="${branch##*/}"
-            git -C .work/fixrepo worktree add -q "$root/.work/verify-$id" "$branch"
-            vibekiller scan --repo "$root/.work/verify-$id" --static-only \
-              --runs-dir "$root/.work/verifyruns/$id" --quiet || [ $? -eq 1 ]
-            vrun="$root/.work/verifyruns/$id/$(ls "$root/.work/verifyruns/$id" | head -1)"
+            git -C "$WORK/fixrepo" worktree add -q "$WORK/verify-$id" "$branch"
+            vibekiller scan --repo "$WORK/verify-$id" --static-only \
+              --runs-dir "$WORK/verifyruns/$id" --quiet || [ $? -eq 1 ]
+            vrun="$WORK/verifyruns/$id/$(ls "$WORK/verifyruns/$id" | head -1)"
             python3 - "$vrun/findings.json" "$id" <<'PY'
           import json, sys
           doc = json.load(open(sys.argv[1]))
@@ -363,19 +354,22 @@ jobs:
           if "engine.semgrep" in skipped:
               print(f"::error::engine.semgrep did not run, so the absence of {want} establishes nothing")
               sys.exit(1)
+          if not ids:
+              print("::error::the verification scan found nothing at all, which usually means it scanned nothing")
+              sys.exit(1)
           if want in ids:
               print(f"::error::{want} is still reported after the fix Giver called proven")
               sys.exit(1)
-          print(f"{want}: absent, and engine.semgrep ran -- independently confirmed")
+          print(f"{want}: absent, engine.semgrep ran, {len(ids)} other findings still reported -- confirmed")
           PY
           done
 
       - name: a newer envelope is refused, not read
         run: |
           set -euo pipefail
-          run_dir=".work/runs/$(ls .work/runs | head -1)"
-          mkdir -p .work/forged
-          python3 - "$run_dir/findings.json" .work/forged/findings.json <<'PY'
+          run_dir="$WORK/runs/$(ls "$WORK/runs" | head -1)"
+          mkdir -p "$WORK/forged"
+          python3 - "$run_dir/findings.json" "$WORK/forged/findings.json" <<'PY'
           import json, sys
           d = json.load(open(sys.argv[1]))
           d["schema_version"] = "99.0"
@@ -386,7 +380,7 @@ jobs:
           # to be exactly 3: exit 1 would mean the document was read and
           # merely had open findings in it.
           set +e
-          ./bin/vibegiver inspect .work/forged/findings.json
+          ./bin/vibegiver inspect "$WORK/forged/findings.json"
           code=$?
           set -e
           if [ "$code" -ne 3 ]; then

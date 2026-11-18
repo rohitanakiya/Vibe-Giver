@@ -88,18 +88,24 @@ constrained transformations checked against the patched fixture as an answer
 key, rather than anything that makes a scan come back clean, and a strategy
 that does not recognise the code it was pointed at refuses instead of guessing.
 
-**A silent rule pack reads as a clean application.** Killer pins
-`semgrep==1.185.0` in its own CI because the silent half of its rule-pack
-assertion is sensitive to the engine, not just the rules. Giver proves a static
-fix by reading that silence, so a pack gone quiet does not fail here — it
-succeeds. Measured in this repository's CI before it was pinned: a
-pipx-installed latest Semgrep reported `engine.semgrep` as having **run** and
-produced **0 findings** on the deliberately vulnerable Flask fixture, where
-1.185.0 produces 11. Followed through the loop, every static finding comes back
-`already_resolved` — nothing to fix. So `vibegiver fix` checks the installed
-Semgrep against the version the bound Killer release pins, and on a mismatch a
-static finding's *absence* becomes inconclusive rather than gone. `vibegiver
-contract` prints both versions.
+**An engine that scans nothing reports a clean application.** Semgrep and
+osv-scanner both skip paths their enclosing git repository ignores. When this
+project's CI staged its test fixture in a gitignored directory, both engines
+scanned **zero files**, exited **0**, and reported **no findings** — and Killer
+correctly recorded them as having run. A deliberately vulnerable application
+came back clean. Measured: `paths scanned: 0` with no errors inside an ignored
+directory, 3 findings on the same file outside one.
+
+Giver's own worktrees are not exposed to this (a worktree is its own git root,
+measured), but the general lesson is the sharp one: **when something that runs
+an external engine reports nothing, check that it looked at any files at all.**
+
+`vibegiver fix` also checks the installed Semgrep against the version the bound
+Killer release pins, and on a mismatch a static finding's *absence* becomes
+inconclusive rather than gone — Killer pins that version because the silent
+half of its rule-pack assertion is engine-sensitive, and Giver reads that
+silence as proof. That guard is prudence on Killer's stated reasoning, not
+something measured here. `vibegiver contract` prints both versions.
 
 **A focused re-scan can mask its own result.** Re-checking one finding means
 `vibekiller scan --only <rule>`, and Killer records every check it did not
