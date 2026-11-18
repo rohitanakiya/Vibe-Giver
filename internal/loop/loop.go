@@ -349,6 +349,15 @@ func one(ctx context.Context, f contract.Finding, opts Options) Outcome {
 	kr.RunsDir = filepath.Join(runDir, "killer")
 	kr.Log = func(s string) { logln("%s", s) }
 
+	// An engine that is not the one the pinned Killer release tests against
+	// is recorded even when the guard in internal/killer has already turned
+	// its silence into inconclusive, because the operator reading a report
+	// needs to know why a finding came back unverifiable.
+	if !kr.Fidelity.Matches {
+		out.Caveats = append(out.Caveats, kr.Fidelity.Reason())
+		logln("engine    %s", kr.Fidelity.Reason())
+	}
+
 	suite := project.Detect(wt.Dir)
 	logln("project   %s %s", suite.Language, suite.Framework)
 	for _, c := range suite.Caveats {

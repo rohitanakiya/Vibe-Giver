@@ -57,6 +57,18 @@ type Stamp struct {
 	// deliberately does not accept the same set; see contract.EnvelopeGate.
 	DocumentSchemaVersionsKillerReads []string `json:"document_schema_versions_killer_reads"`
 
+	// SemgrepPinnedByKiller is the Semgrep version the pinned Killer release
+	// tests its rule pack against.
+	//
+	// It is part of the contract in every sense that matters here, even
+	// though it is not in the schema. Giver proves a static fix by re-running
+	// Killer's pack and reading the silence, and the silent half of that pack
+	// is sensitive to the engine as well as to the rules -- which is why
+	// Killer pins it in its own CI. Under a different engine the pack can go
+	// quiet, and quiet is exactly what Giver reads as success.
+	SemgrepPinnedByKiller string `json:"semgrep_pinned_by_killer"`
+	SemgrepPinNote        string `json:"semgrep_pin_note"`
+
 	Note string `json:"note"`
 }
 

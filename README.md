@@ -88,6 +88,19 @@ constrained transformations checked against the patched fixture as an answer
 key, rather than anything that makes a scan come back clean, and a strategy
 that does not recognise the code it was pointed at refuses instead of guessing.
 
+**A silent rule pack reads as a clean application.** Killer pins
+`semgrep==1.185.0` in its own CI because the silent half of its rule-pack
+assertion is sensitive to the engine, not just the rules. Giver proves a static
+fix by reading that silence, so a pack gone quiet does not fail here — it
+succeeds. Measured in this repository's CI before it was pinned: a
+pipx-installed latest Semgrep reported `engine.semgrep` as having **run** and
+produced **0 findings** on the deliberately vulnerable Flask fixture, where
+1.185.0 produces 11. Followed through the loop, every static finding comes back
+`already_resolved` — nothing to fix. So `vibegiver fix` checks the installed
+Semgrep against the version the bound Killer release pins, and on a mismatch a
+static finding's *absence* becomes inconclusive rather than gone. `vibegiver
+contract` prints both versions.
+
 **A focused re-scan can mask its own result.** Re-checking one finding means
 `vibekiller scan --only <rule>`, and Killer records every check it did not
 schedule as skipped. Killer's own join — rule id, then layer when that source

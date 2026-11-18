@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rohitanakiya/Vibe-Giver/internal/contract"
+	"github.com/rohitanakiya/Vibe-Giver/internal/killer"
 )
 
 // --- contract --------------------------------------------------------------
@@ -48,6 +49,18 @@ either way.`,
 			fmt.Fprintln(out, "cannot tell a check that found nothing from one that never ran. No fix can be")
 			fmt.Fprintln(out, "proven against one.")
 			fmt.Fprintln(out)
+
+			// The engine matters as much as the schema. Giver proves a static
+			// fix by reading Killer's rule pack silence, and that silence is
+			// sensitive to the Semgrep version as well as to the rules.
+			fmt.Fprintf(out, "Semgrep Killer %s pins   %s\n", s.PinnedTag, s.SemgrepPinnedByKiller)
+			fid := killer.CheckSemgrepFidelity()
+			if fid.Matches {
+				fmt.Fprintf(out, "Semgrep installed here       %s\n\n", fid.Installed)
+			} else {
+				fmt.Fprintf(out, "Semgrep installed here       %s   <-- MISMATCH\n", displayVersion(fid.Installed))
+				fmt.Fprintf(out, "  %s\n\n", fid.Reason())
+			}
 
 			fmt.Fprintf(out, "Rules `vibekiller reproduce` can re-run (%d of 45 pack rules and 14 checks):\n",
 				len(contract.ReproducibleRules))
@@ -245,4 +258,12 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n-3] + "..."
+}
+
+// displayVersion names an absent engine rather than printing a blank.
+func displayVersion(v string) string {
+	if v == "" {
+		return "not installed"
+	}
+	return v
 }

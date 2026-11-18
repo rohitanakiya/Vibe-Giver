@@ -51,6 +51,11 @@ type Runner struct {
 
 	// Log receives each command line and its outcome, for the run record.
 	Log func(string)
+
+	// Fidelity is whether the static engine on this machine is the one the
+	// pinned Killer release tests its rule pack against. It is consulted
+	// before any absence is read as a fix; see GuardStaticAbsence.
+	Fidelity EngineFidelity
 }
 
 // Resolve finds the Killer binary and checks it runs, so a missing or broken
@@ -258,7 +263,11 @@ func (r *Runner) FocusedRescan(ctx context.Context, f contract.Finding, subdir s
 	if err != nil {
 		return contract.Inconclusive(fmt.Sprintf("the focused re-scan established nothing: %v", err)), nil, res, nil
 	}
-	return contract.ClassifyInRescan(doc, f), doc, res, nil
+	// The coverage join says whether the producing check ran. That is
+	// necessary and not sufficient for a static finding: a rule pack can run
+	// under the wrong engine and report nothing while looking healthy, and
+	// that silence is what an absence-based verdict is made of.
+	return GuardStaticAbsence(f, contract.ClassifyInRescan(doc, f), r.Fidelity), doc, res, nil
 }
 
 // needsTarget reports whether a check requires a running instance. The three

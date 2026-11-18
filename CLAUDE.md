@@ -243,6 +243,37 @@ auto-edit a leaked secret or rewrite history; no sweeping refactors disguised
 as fixes; one finding to one branch; refuse a dirty tree; and operate only on a
 repository the operator controls.
 
+## Pin Semgrep to what the bound Killer release pins
+
+`internal/contract/killerschema/stamp.json` records
+`semgrep_pinned_by_killer`. Keep it equal to whatever the Killer release this
+build is bound to pins in its own CI (v1.0.0 pins `semgrep==1.185.0`), and pin
+the same version in this repository's CI.
+
+This is not tidiness, and it is a stronger requirement here than it is in
+Killer. Killer pins it because the silent half of its rule-pack assertion is
+sensitive to the engine, so a floating version turns an upstream change into a
+red build. **Giver proves a static fix by reading that silence, so a pack gone
+quiet does not fail here — it succeeds.**
+
+Measured in this repository's own CI, before the pin: a pipx-installed latest
+Semgrep reported `engine.semgrep` as having run and produced **0 findings** on
+`flask-vulnerable`, where 1.185.0 produces 11. Follow that through the loop and
+gate 0 finds the weakness already absent, so every static finding comes back
+`already_resolved` — nothing to fix — for a deliberately vulnerable
+application. A false clean, reached honestly from a silent engine, in the one
+direction nobody re-reads.
+
+`killer.GuardStaticAbsence` is the guard: when the installed Semgrep is not the
+pinned one, a static finding's *absence* becomes inconclusive instead of gone,
+so the outcome is `blocked_unverifiable`. Presence is never downgraded — a
+reported finding evidently matched, and that does not depend on the engine.
+Same principle as refusing a 1.0 envelope's absences: when the thing that
+would have told us is not working, absence is not evidence.
+
+When bumping to a newer Killer, bump the stamp, the CI pin and
+`GuardStaticAbsence`'s expectation together, and re-run the round trip.
+
 ## An engine that ran and learned nothing
 
 `engine.osv-scanner` consults a remote advisory service. On two CI runs of the

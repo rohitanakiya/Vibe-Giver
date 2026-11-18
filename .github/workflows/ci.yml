@@ -177,9 +177,31 @@ jobs:
       # network, so it gives the same answer every time. It is also the engine
       # the v0 strategies actually depend on: both misconfiguration findings
       # they fix are sast.
+      # Pinned to the version Killer v1.0.0 pins in its own CI, and pinned for
+      # a stronger reason here than there.
+      #
+      # Killer pins it because the silent half of its rule-pack assertion is
+      # sensitive to the engine, so a floating version turns an upstream change
+      # into a red build on a commit that touched nothing. Giver inherits that
+      # and makes it worse: it proves a static fix by reading that silence, so
+      # a pack gone quiet does not fail here, it succeeds. Measured on this
+      # workflow before the pin: a pipx-installed latest Semgrep reported
+      # engine.semgrep as having run and produced 0 findings on
+      # flask-vulnerable, where 1.185.0 produces 11. Followed through the loop
+      # that is already_resolved -- nothing to fix -- for a deliberately
+      # vulnerable application.
+      #
+      # `vibegiver fix` now refuses to read a static absence as a fix when the
+      # installed Semgrep is not the pinned one, so a future drift is a
+      # blocked_unverifiable rather than a false clean. The pin keeps this job
+      # testing the fixes rather than testing that guard.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: install semgrep
         run: |
-          pipx install semgrep
+          pip install --disable-pip-version-check semgrep==1.185.0
           # Verified rather than assumed: a silent install failure would make
           # the next steps scan with no static engine, find nothing to fix,
           # and look like a pass.

@@ -118,6 +118,16 @@ take your work with it.`,
 			}
 			fmt.Fprintf(out, "Using %s\n", version)
 
+			// Checked before anything is attempted, because a static
+			// verification under the wrong engine does not fail loudly: it
+			// reports nothing, and nothing is what Giver reads as success.
+			kr.Fidelity = killer.CheckSemgrepFidelity()
+			if kr.Fidelity.Matches {
+				fmt.Fprintf(out, "  %s\n", kr.Fidelity.Reason())
+			} else {
+				fmt.Fprintf(out, "  WARNING: %s\n", kr.Fidelity.Reason())
+			}
+
 			cfg, note, err := ensureKillerConfig(kr.Binary, r.Root, configPath, absRuns)
 			if err != nil {
 				return exitWith(ExitError, "%v", err)
