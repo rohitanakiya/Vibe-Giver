@@ -113,6 +113,7 @@ Three guarantees, in the order they matter:
 	cmd.AddCommand(
 		newContractCmd(),
 		newInspectCmd(),
+		newFixCmd(),
 	)
 	return cmd
 }

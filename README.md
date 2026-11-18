@@ -8,9 +8,10 @@ own test suite — and opens it as a pull request for a person to review.
 Killer finds the weakness and proves it is real. Giver closes it and proves it
 is gone. Neither tool is allowed to assert anything it has not measured.
 
-> **Status: in development.** Step 0, the contract binding, is built and
-> verified against real Killer output. No fix logic exists yet, so the only
-> commands today are `contract` and `inspect`. The roadmap is at the bottom.
+> **Status: v0.** The contract binding and the fix→verify loop are built, and
+> `vibegiver fix` proposes verified fixes for `security-misconfiguration`
+> findings — on a branch and a patch, no pull requests yet. Proven end to end
+> against Vibe Killer's own Flask fixture. The roadmap is at the bottom.
 
 ## Three guarantees
 
@@ -75,6 +76,17 @@ its diffs are the smallest and safest. A Giver that read exit 0 as proof would
 have certified every one of those fixes by running a command that sent no
 traffic. So exit 0 is read as `gone` only when the dynamic sentinel line is
 present; every other exit 0 is `inconclusive` and says why.
+
+**A static re-scan cannot tell a fix from a dodge.** The rule behind the CORS
+finding is a regex over `Access-Control-Allow-Origin ... = request.headers`.
+Assigning the reflected origin to a local variable first satisfies it
+completely, and changes nothing: every site on the internet is still echoed
+back with credentials allowed. The re-scan says `gone`. That is measured, not
+hypothesised — `TestAPatternDodgeSilencesTheRuleWithoutFixingAnything` writes
+the dodge out and asserts the rule stops matching it. So strategies here are
+constrained transformations checked against the patched fixture as an answer
+key, rather than anything that makes a scan come back clean, and a strategy
+that does not recognise the code it was pointed at refuses instead of guessing.
 
 **A focused re-scan can mask its own result.** Re-checking one finding means
 `vibekiller scan --only <rule>`, and Killer records every check it did not
@@ -155,6 +167,32 @@ vibegiver contract
 vibegiver inspect runs/20261118-120000-123456
 ```
 
+```bash
+vibegiver fix runs/20261118-120000-123456 --repo .
+```
+
+`fix` handles each finding in its own git worktree on its own branch,
+`vibegiver/<finding_id>`, so your checkout is never modified. Every gate has to
+return `gone`: the finding reproduced here before anything changed, it is gone
+after, the same re-scan introduced nothing new, the project's tests still pass,
+and the changed files still parse and build. If they all pass, the branch is
+kept with one commit and the patch, the pull request body and the full gate
+output land in the run directory. If any gate fails, **the branch is deleted
+and nothing is left behind** — the rejected diff is kept in the run record
+instead. It requires a clean working tree, and it never pushes or merges.
+
+### What "no test suite" does
+
+Most of the applications this tool exists for have no tests — none of Killer's
+four fixtures does. Reporting "tests passed" there would be the exact failure
+this project is built to avoid: the thing asserting it cannot tell a green
+suite from an absent one. Reporting a failure would be a different lie.
+
+So a missing suite is a **caveat**: recorded, never counted as a pass, and
+printed in the summary, the commit message and the pull request body under
+"What was not verified". A gate that could not run says so, where the person
+reviewing the change will read it.
+
 `inspect` changes nothing. It validates a run against the contract and reports
 what Giver would attempt, what needs a person, how each finding would be
 verified, and what the run could not establish.
@@ -193,9 +231,13 @@ implement. Never tune it to make a test pass.
 
 ## Roadmap
 
-- **v0** — contract binding *(done: schema, envelope gate, three-outcome
-  verdict, coverage join, CLI binding, `inspect`)*; then the fix→verify loop on
-  `security-misconfiguration` only, with branch and local patch output, no PRs.
+- **v0** — *done.* Contract binding (schema, envelope gate, three-outcome
+  verdict, coverage join, CLI binding, `inspect`), and the fix→verify loop on
+  `security-misconfiguration`, with branch and local patch output and no PRs.
+  Two strategies: `misconfig.debug-mode-enabled` (Flask, Django, FastAPI and
+  uvicorn forms) and the Python `misconfig.cors-credentialed-wildcard`. Proven
+  end to end on Killer's Flask fixture: both findings fixed, and both confirmed
+  absent by a Killer scan run separately from the one Giver used to verify.
 - **v1** — `injection` and `broken-access-control`; regression-test generation;
   PR creation; `fix_report.json`.
 - **v2** — cross-file root-cause detection, dependency bumps,

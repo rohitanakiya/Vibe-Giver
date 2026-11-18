@@ -216,6 +216,130 @@ jobs:
             exit 1
           fi
 
+      # The v0 loop, end to end, against the fixture Killer ships. This is the
+      # round trip the brief calls the demo and the test: Killer finds it,
+      # Giver fixes it, and a Killer scan that Giver did not run confirms it.
+      #
+      # Semgrep is needed here and not above: the two misconfiguration
+      # findings v0 fixes are static, and engine.semgrep is what produces
+      # them. Without it the step would assert nothing, so it checks that the
+      # findings are there before trying to fix them.
+      - name: install semgrep
+        run: |
+          pipx install semgrep
+          # Verified rather than assumed: a silent install failure would make
+          # the next step scan with no static engine, find nothing to fix, and
+          # look like a pass.
+          semgrep --version
+
+      - name: case C, the v0 loop fixes the misconfiguration findings
+        run: |
+          set -euo pipefail
+
+          # A fixture repository with an owner who is not Vibe Giver, so the
+          # commit identity and the clean-tree rule are exercised for real.
+          rm -rf .work/fixrepo
+          mkdir -p .work/fixrepo
+          cp .killer/fixtures/flask-vulnerable/app.py .killer/fixtures/flask-vulnerable/requirements.txt .work/fixrepo/
+          cd .work/fixrepo
+          git init -q
+          git config user.name "Fixture Owner"
+          git config user.email owner@example.invalid
+          git add -A
+          git commit -qm "the flask-vulnerable fixture"
+          head_before="$(git rev-parse HEAD)"
+          cd ../..
+
+          vibekiller scan --repo .work/fixrepo --static-only --runs-dir .work/fixruns --quiet || [ $? -eq 1 ]
+          run_dir=".work/fixruns/$(ls .work/fixruns | head -1)"
+
+          misconfig="$(python3 -c "
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          print(len([f for f in d['findings'] if f['category']=='security-misconfiguration']))
+          " "$run_dir/findings.json")"
+          echo "misconfiguration findings to fix: $misconfig"
+          if [ "$misconfig" -lt 2 ]; then
+            echo "::error::Expected at least 2 security-misconfiguration findings; this step would assert nothing." >&2
+            exit 1
+          fi
+
+          # Exit 1 is expected: the source scan skipped checks, so nothing here
+          # is a clean bill of health even once the fixes land.
+          set +e
+          ./bin/vibegiver fix "$run_dir" --repo .work/fixrepo --runs-dir .work/giverruns
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "::error::vibegiver fix exited $code, want 1." >&2
+            exit 1
+          fi
+
+          fixed="$(python3 -c "
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          print(len([o for o in d['outcomes'] if o['status']=='fixed']))
+          " .work/giverruns/fix_report.json)"
+          echo "fixed: $fixed"
+          if [ "$fixed" -lt 2 ]; then
+            echo "::error::Giver proved $fixed fixes, want at least 2." >&2
+            exit 1
+          fi
+
+          # The operator checkout must be untouched: same HEAD, clean tree.
+          cd .work/fixrepo
+          if [ "$(git rev-parse HEAD)" != "$head_before" ]; then
+            echo "::error::Giver moved the operator HEAD." >&2
+            exit 1
+          fi
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::Giver left the operator working tree dirty." >&2
+            exit 1
+          fi
+          if [ "$(git worktree list | wc -l)" -ne 1 ]; then
+            echo "::error::Giver left a worktree behind." >&2
+            git worktree list >&2
+            exit 1
+          fi
+          # No tool trailers in anything Giver wrote into someone else's repo.
+          if git log --all --format='%B' | grep -qiE "co-authored-by|generated with \[claude"; then
+            echo "::error::Giver wrote an attribution trailer into a commit message." >&2
+            exit 1
+          fi
+          git branch --list 'vibegiver/*'
+          cd ../..
+
+      # The independent confirmation. Giver verified these fixes with its own
+      # focused re-scans; this scans each branch separately and asks Killer
+      # again, because a tool checking its own work is the thing this project
+      # does not accept as evidence.
+      - name: case C, a separate Killer scan confirms each fix
+        run: |
+          set -euo pipefail
+          root="$PWD"
+          branches="$(git -C .work/fixrepo branch --list 'vibegiver/*' --format='%(refname:short)')"
+          for branch in $branches; do
+            id="${branch##*/}"
+            git -C .work/fixrepo worktree add -q "$root/.work/verify-$id" "$branch"
+            vibekiller scan --repo "$root/.work/verify-$id" --static-only \
+              --runs-dir "$root/.work/verifyruns/$id" --quiet || [ $? -eq 1 ]
+            vrun="$root/.work/verifyruns/$id/$(ls "$root/.work/verifyruns/$id" | head -1)"
+            python3 - "$vrun/findings.json" "$id" <<'PY'
+          import json, sys
+          doc = json.load(open(sys.argv[1]))
+          want = sys.argv[2]
+          ids = {f["finding_id"] for f in doc["findings"]}
+          skipped = {s["check_id"] for s in doc.get("skipped", [])}
+          if "engine.semgrep" in skipped:
+              print(f"::error::engine.semgrep did not run, so the absence of {want} establishes nothing")
+              sys.exit(1)
+          if want in ids:
+              print(f"::error::{want} is still reported after the fix Giver called proven")
+              sys.exit(1)
+          print(f"{want}: absent, and engine.semgrep ran -- independently confirmed")
+          PY
+          done
+
       - name: a newer envelope is refused, not read
         run: |
           set -euo pipefail

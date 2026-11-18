@@ -11,3 +11,6 @@
 # non-zero exit code to 1 and so hides the difference between "still open" and
 # "contract refused".
 /bin/
+
+# Giver test scratch
+/.work/

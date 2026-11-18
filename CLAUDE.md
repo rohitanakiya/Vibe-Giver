@@ -67,6 +67,42 @@ So:
   a forgotten assignment fails closed. Do not add a code path that reaches
   `Gone` without passing through its constructor.
 
+## A strategy is a constrained transformation, not a scan-silencer
+
+The thing that makes a fix strategy honest is not that the re-scan comes back
+clean. It is that the change is one a reviewer would recognise as the fix.
+
+Measured, in `TestAPatternDodgeSilencesTheRuleWithoutFixingAnything`: the rule
+behind the CORS finding is a regex over
+`Access-Control-Allow-Origin ... = request.headers`, so assigning the
+reflected origin to a local variable first satisfies it completely while the
+application still echoes every origin back with credentials allowed. A static
+re-scan reports `gone`. **Passing a static re-scan is necessary and not
+sufficient.**
+
+So, for anything in `internal/fix`:
+
+- Check the output against the **patched twin**, not against what the strategy
+  happens to emit. `fixtures/<stack>-patched` is the same application with
+  every weakness correctly fixed, and Killer's CI asserts it yields zero
+  confirmed findings, so it is the answer key. Both v0 strategies match it, and
+  for debug mode Killer's own `remediation.guidance` names the same expression
+  independently.
+- **Fail closed.** A strategy that does not recognise the code at the finding
+  location returns an error. `fix_failed` with a reason is a good outcome; a
+  plausible edit that satisfies a rule is the worst one, because it is
+  indistinguishable from a fix in every report.
+- Anchor on `location.line` and only that line. Searching the file for
+  something to change turns a stale line number into an edit somewhere the
+  finding never pointed at.
+- Keep diffs minimal — `assertOnlyLinesChanged` exists to hold generators to
+  that, because the brief asks for reviewable changes and a generator will
+  reformat a file given the chance.
+- `dynamic_rule` is in the rule pack metadata and **not** in `findings.json`,
+  so Giver cannot read a static rule's behavioural twin from a finding. Any
+  mapping of that kind has to live here and is therefore a drift risk; worth
+  asking Killer to expose it.
+
 ## Never tune the corpus
 
 `internal/contract/testdata/` holds **real Vibe Killer output**, not
