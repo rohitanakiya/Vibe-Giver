@@ -162,12 +162,28 @@ jobs:
             exit 1
           fi
 
-      # Case B: with a scanner present, the same fixture yields real findings.
-      # osv-scanner is used rather than Semgrep because it is a Go install and
-      # takes seconds; the fixture pins old dependencies deliberately, so it
-      # is the layer guaranteed to produce findings here.
-      - name: install osv-scanner
-        run: go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
+      # Semgrep, not osv-scanner, and the reason is worth recording.
+      #
+      # This step first used osv-scanner, because it is a Go install and takes
+      # seconds where Semgrep's does not. It found 42 findings on the first
+      # run and 0 on the second, from the same fixture and the same commit:
+      # it consults a remote advisory service, so it is network-dependent, and
+      # Killer correctly recorded it as having run both times. Nothing in that
+      # output distinguishes "ran and the dependencies are fine" from "ran and
+      # learned nothing", which is this project's own bug shape arriving from
+      # the outside.
+      #
+      # Semgrep ships its rule pack embedded in the Killer binary and needs no
+      # network, so it gives the same answer every time. It is also the engine
+      # the v0 strategies actually depend on: both misconfiguration findings
+      # they fix are sast.
+      - name: install semgrep
+        run: |
+          pipx install semgrep
+          # Verified rather than assumed: a silent install failure would make
+          # the next steps scan with no static engine, find nothing to fix,
+          # and look like a pass.
+          semgrep --version
 
       - name: case B, a scanner present - findings appear and are attemptable
         run: |
@@ -184,7 +200,7 @@ jobs:
 
           run_dir="runs/$(ls runs | head -1)"
           found="$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1]))['findings']))" "$run_dir/findings.json")"
-          echo "with osv-scanner: $found finding(s)"
+          echo "with semgrep: $found finding(s)"
           if [ "$found" -eq 0 ]; then
             echo "::error::No findings with a scanner installed; this step asserts nothing." >&2
             exit 1
@@ -220,18 +236,10 @@ jobs:
       # round trip the brief calls the demo and the test: Killer finds it,
       # Giver fixes it, and a Killer scan that Giver did not run confirms it.
       #
-      # Semgrep is needed here and not above: the two misconfiguration
-      # findings v0 fixes are static, and engine.semgrep is what produces
-      # them. Without it the step would assert nothing, so it checks that the
-      # findings are there before trying to fix them.
-      - name: install semgrep
-        run: |
-          pipx install semgrep
-          # Verified rather than assumed: a silent install failure would make
-          # the next step scan with no static engine, find nothing to fix, and
-          # look like a pass.
-          semgrep --version
-
+      # It needs the Semgrep installed above: both misconfiguration findings
+      # v0 fixes are sast, so without that engine there is nothing to fix and
+      # this step would assert nothing. It checks they are there before
+      # trying.
       - name: case C, the v0 loop fixes the misconfiguration findings
         run: |
           set -euo pipefail

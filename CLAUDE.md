@@ -242,3 +242,20 @@ claim a fix without a `gone` result, green tests and no new findings; never
 auto-edit a leaked secret or rewrite history; no sweeping refactors disguised
 as fixes; one finding to one branch; refuse a dirty tree; and operate only on a
 repository the operator controls.
+
+## An engine that ran and learned nothing
+
+`engine.osv-scanner` consults a remote advisory service. On two CI runs of the
+same fixture at the same commit it reported **42 findings and then 0**, and
+Killer correctly recorded it as having run both times, because it exited 0.
+
+Nothing in that output distinguishes "ran, and these dependencies are fine"
+from "ran, and learned nothing". It is this project's own bug shape arriving
+from outside it, and it is why CI's round trip depends on Semgrep instead:
+Killer ships the rule pack embedded, so it needs no network and gives the same
+answer every time.
+
+The general rule for anything asserted in CI here: prefer the engine whose
+answer is determined by the inputs. If a network-dependent engine has to be
+used, assert the shape you expect from it first, so a quiet failure is a red
+build rather than a green one.
